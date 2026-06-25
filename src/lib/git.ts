@@ -14,9 +14,19 @@ interface GitRunner {
   (args: string[]): string;
 }
 
-/** Default runner: invoke `git` in `cwd` and return trimmed stdout. */
+/**
+ * Default runner: invoke `git` in `cwd` and return stdout.
+ *
+ * stderr is piped (captured on the thrown error) rather than inherited, so
+ * git's internal probing — e.g. `rev-parse --verify HEAD~1` failing on a repo's
+ * first commit — never leaks "fatal: …" lines into the commit/hook output.
+ */
 const defaultRunner: GitRunner = (args) =>
-  execFileSync("git", args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  execFileSync("git", args, {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
 /* ----------------------------- pure parsers ------------------------------ */
 

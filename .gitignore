@@ -5,4 +5,5 @@ dist/
 coverage/
 *.tmp
 .beacon/
+tsup.config.bundled_*.mjs
 
