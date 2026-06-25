@@ -76,10 +76,17 @@ export function extractJson(text: string): unknown {
 
   try {
     return JSON.parse(candidate);
-  } catch (err) {
-    throw new BeaconError("Failed to parse JSON from LLM response", "API_ERROR", {
-      cause: String(err),
-      raw: text,
-    });
+  } catch {
+    // One tolerant retry: drop trailing commas before } or ] (a common model
+    // slip). Deliberately NOT stripping // comments — that would corrupt URLs
+    // like https:// inside string values.
+    try {
+      return JSON.parse(candidate.replace(/,(\s*[}\]])/g, "$1"));
+    } catch (err) {
+      throw new BeaconError("Failed to parse JSON from LLM response", "API_ERROR", {
+        cause: String(err),
+        raw: text,
+      });
+    }
   }
 }

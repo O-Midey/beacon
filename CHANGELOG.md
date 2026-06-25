@@ -20,6 +20,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Provider-aware API-key resolution: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`
   (env vars take precedence over the stored key).
 
+### Fixed
+
+- **LLM JSON parsing.** Prompt templates no longer embed `//` comments (which
+  models echoed back, producing invalid JSON). All four templates use clean,
+  comment-free JSON with constraints in prose, plus explicit "no comments / no
+  trailing commas / no fences" instructions. `extractJson` also retries once
+  after stripping trailing commas (without touching `https://` URLs in strings).
+
 ### Changed
 
 - **Pipeline reordered to `capture → safety → significance → draft → queue`.**

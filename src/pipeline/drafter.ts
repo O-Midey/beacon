@@ -37,7 +37,7 @@ function buildSystemPrompt(config: BeaconConfig): string {
 Platform guidance:
 ${guidance}
 
-Return exactly this JSON object and nothing else:
+Return ONE JSON object and nothing else. No markdown, no code fences around the JSON, no comments, no trailing commas. Any code blocks inside string values (e.g. the dev.to body) must be valid escaped JSON string content. Use exactly this shape:
 {
   ${shapes}
 }${authorNotes}`;

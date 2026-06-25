@@ -15,15 +15,15 @@ import {
  * for cost control and because significance is a coarse judgement.
  */
 
-const SYSTEM_PROMPT = `You are a significance filter for a build-in-public tool. A commit is significant if it represents: a new feature, a non-trivial architectural decision, an interesting bug fix, a published artifact (npm, deployment), or a meaningful milestone. Routine refactors, typo fixes, dependency bumps, and config tweaks are NOT significant. Return JSON only.
+const SYSTEM_PROMPT = `You are a significance filter for a build-in-public tool. A commit is significant if it represents: a new feature, a non-trivial architectural decision, an interesting bug fix, a published artifact (npm, deployment), or a meaningful milestone. Routine refactors, typo fixes, dependency bumps, and config tweaks are NOT significant.
 
-Respond with exactly this JSON shape and nothing else:
-{
-  "isSignificant": boolean,
-  "score": number,            // 0-10 integer
-  "reason": string,           // one or two sentences
-  "suggestedAngles": [string] // 2-3 post angles if significant, else []
-}`;
+Respond with ONE JSON object and nothing else. No markdown, no code fences, no comments, no trailing commas. Use exactly these keys:
+- "isSignificant": boolean
+- "score": integer from 0 to 10
+- "reason": string, one or two sentences
+- "suggestedAngles": array of 2-3 short strings if significant, otherwise an empty array
+
+Example: {"isSignificant":true,"score":8,"reason":"Adds a new auth pipeline.","suggestedAngles":["why we chose JWTs","handling refresh tokens"]}`;
 
 const EXCERPT_CHARS = 1500;
 

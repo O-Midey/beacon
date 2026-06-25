@@ -6,10 +6,7 @@ import { LinkedInDraftSchema, type PlatformName } from "../types/index.js";
 export const linkedin = {
   name: "linkedin" as PlatformName,
   schema: LinkedInDraftSchema,
-  jsonShape: `"linkedin": {
-    "hook": string,   // the single most interesting line, used as the opener
-    "body": string    // 150-300 words, hook-first narrative, NO raw code blocks
-  }`,
+  jsonShape: `"linkedin": { "hook": string, "body": string }`,
   guidance:
-    "LinkedIn: narrative arc, professional framing, no raw code blocks. The hook must be the most interesting insight from the work, not 'I just built X'. Body is 150-300 words and begins with the hook.",
+    "LinkedIn: narrative arc, professional framing, no raw code blocks. `hook` is the single most interesting line (the most interesting insight from the work, not 'I just built X'). `body` is 150-300 words, begins with the hook, and contains no raw code blocks.",
 } as const;

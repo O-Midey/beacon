@@ -8,11 +8,7 @@ export const twitter = {
   name: "twitter" as PlatformName,
   schema: TwitterDraftSchema,
   /** JSON shape hint injected into the drafter prompt. */
-  jsonShape: `"twitter": {
-    "tweets": [string, ...],   // 1-4 tweets, each <= 280 chars, reads as a real thread
-    "codeSnippet": string,      // OPTIONAL: <= 15 lines, only if it illustrates the point
-    "hashtags": [string, ...]   // 2-4 relevant hashtags, no '#' prefix needed
-  }`,
+  jsonShape: `"twitter": { "tweets": [string], "codeSnippet": string, "hashtags": [string] }`,
   guidance:
-    "Twitter: punchy, technical, occasionally includes a short code snippet in the last tweet if it illustrates the point clearly. Threads feel like a real engineer explaining something to other engineers. Each tweet must be <= 280 characters.",
+    "Twitter: punchy, technical, occasionally includes a short code snippet in the last tweet if it illustrates the point clearly. Threads feel like a real engineer explaining something to other engineers. `tweets` is 1-4 strings, each <= 280 characters. `codeSnippet` is OPTIONAL (<= 15 lines, omit the key if unused). `hashtags` is 2-4 strings without the '#' prefix.",
 } as const;

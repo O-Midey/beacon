@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createProvider } from "../../src/lib/llm/index.js";
+import { createProvider, extractJson } from "../../src/lib/llm/index.js";
 import { OpenAiProvider } from "../../src/lib/llm/openai.js";
 import { AnthropicProvider } from "../../src/lib/llm/anthropic.js";
 import { BeaconConfigSchema } from "../../src/types/index.js";
@@ -7,6 +7,28 @@ import { BeaconConfigSchema } from "../../src/types/index.js";
 function cfg(overrides: Record<string, unknown> = {}) {
   return BeaconConfigSchema.parse({ apiKey: "test-key", ...overrides });
 }
+
+describe("extractJson", () => {
+  it("parses a bare JSON object", () => {
+    expect(extractJson('{"a":1}')).toEqual({ a: 1 });
+  });
+  it("unwraps a fenced response", () => {
+    expect(extractJson('```json\n{"a":1}\n```')).toEqual({ a: 1 });
+  });
+  it("slices JSON out of surrounding prose", () => {
+    expect(extractJson('Sure! Here you go:\n{"a":1}\nHope that helps')).toEqual({ a: 1 });
+  });
+  it("tolerates trailing commas", () => {
+    expect(extractJson('{"a":1,"b":[1,2,],}')).toEqual({ a: 1, b: [1, 2] });
+  });
+  it("preserves https:// URLs inside string values", () => {
+    const out = extractJson('{"url":"https://omotosho.xyz/x"}') as { url: string };
+    expect(out.url).toBe("https://omotosho.xyz/x");
+  });
+  it("throws API_ERROR on unrecoverable garbage", () => {
+    expect(() => extractJson("not json at all")).toThrowError(/parse JSON/i);
+  });
+});
 
 describe("createProvider", () => {
   it("returns an Anthropic provider by default", () => {
