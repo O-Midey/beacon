@@ -1,0 +1,80 @@
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { BeaconError, BeaconConfigSchema, type BeaconConfig } from "../types/index.js";
+import { beaconHome, configPath } from "./paths.js";
+
+/**
+ * Read/write `~/.beacon/config.json`. The file is written with mode 0600 so the
+ * stored API key is not world-readable. All defaults live in the Zod schema, so
+ * a partial or first-run file still parses into a complete config.
+ */
+
+const FILE_MODE = 0o600;
+const DIR_MODE = 0o700;
+
+function ensureHome(): void {
+  const home = beaconHome();
+  if (!existsSync(home)) {
+    mkdirSync(home, { recursive: true, mode: DIR_MODE });
+  }
+}
+
+/**
+ * Load config, applying schema defaults. Returns a fully-populated config even
+ * when no file exists yet (so `beacon config set` can bootstrap one).
+ */
+export function loadConfig(): BeaconConfig {
+  const path = configPath();
+  if (!existsSync(path)) {
+    return BeaconConfigSchema.parse({});
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch (err) {
+    throw new BeaconError("Config file is not valid JSON", "CONFIG_MISSING", {
+      path,
+      cause: String(err),
+    });
+  }
+  const parsed = BeaconConfigSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new BeaconError("Config file failed validation", "CONFIG_MISSING", {
+      path,
+      issues: parsed.error.issues,
+    });
+  }
+  return parsed.data;
+}
+
+/** Atomically persist config with restrictive permissions. */
+export function saveConfig(config: BeaconConfig): void {
+  ensureHome();
+  const path = configPath();
+  const tmp = `${path}.tmp`;
+  const serialized = JSON.stringify(config, null, 2);
+  writeFileSync(tmp, serialized, { mode: FILE_MODE });
+  renameSync(tmp, path);
+  // renameSync preserves the tmp file's mode, but re-assert defensively.
+  chmodSync(path, FILE_MODE);
+}
+
+/**
+ * Resolve the API key with env var taking precedence over stored config.
+ * Throws CONFIG_MISSING if neither is set, so LLM stages fail loudly.
+ */
+export function resolveApiKey(config: BeaconConfig): string {
+  const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
+  if (fromEnv) return fromEnv;
+  if (config.apiKey.trim()) return config.apiKey.trim();
+  throw new BeaconError(
+    "No Anthropic API key found. Set ANTHROPIC_API_KEY or run `beacon config set api-key <key>`.",
+    "CONFIG_MISSING",
+  );
+}
+
+/** Mask a key for display, e.g. `sk-ant…f9a2`. */
+export function maskKey(key: string): string {
+  if (!key) return "(not set)";
+  if (key.length <= 8) return "****";
+  return `${key.slice(0, 6)}…${key.slice(-4)}`;
+}

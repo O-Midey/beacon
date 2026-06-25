@@ -1,0 +1,48 @@
+{
+  "name": "beacon-bip",
+  "version": "0.1.0",
+  "description": "Beacon — a local CLI that watches your git workspace and auto-drafts build-in-public content for Twitter/X, LinkedIn, and dev.to.",
+  "type": "module",
+  "bin": {
+    "beacon": "./dist/cli/index.js"
+  },
+  "files": [
+    "dist",
+    "hooks",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "build-in-public",
+    "cli",
+    "content",
+    "git-hook",
+    "anthropic"
+  ],
+  "author": "Mide (omotosho.xyz)",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@inquirer/prompts": "^7.2.1",
+    "clipboardy": "^4.0.0",
+    "commander": "^12.1.0",
+    "nanoid": "^5.0.9",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

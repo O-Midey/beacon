@@ -1,0 +1,5 @@
+#!/bin/sh
+# Beacon: build-in-public content generator
+# Installed by `beacon install`. Runs the pipeline after each commit and logs
+# to ~/.beacon/beacon.log without polluting commit output.
+beacon run --silent 2>&1 | tee -a "$HOME/.beacon/beacon.log"
