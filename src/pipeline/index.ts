@@ -9,9 +9,9 @@ import { assessSignificance, meetsThreshold } from "./significance.js";
  * Pipeline orchestrator — thin by design. All business logic lives in the
  * individual stage modules; this file only sequences them and reports outcomes.
  *
- * Stage order is non-negotiable: capture → significance → safety → draft →
- * queue. Safety always runs before draft, and the drafter only ever sees the
- * redacted diff produced by safety.
+ * Stage order is non-negotiable: capture → safety → significance → draft →
+ * queue. Safety runs before BOTH LLM calls, so neither the significance filter
+ * nor the drafter ever sees a raw, unredacted diff.
  */
 
 export type PipelineOutcome =
@@ -45,19 +45,19 @@ export async function runPipeline(
   // Stage 1 — Capture
   const snapshot = options.snapshot ?? capture(config);
 
-  // Stage 2 — Significance
-  const significance = await assessSignificance(snapshot, config);
-  if (!options.force && !meetsThreshold(significance, config)) {
-    return { kind: "not_significant", snapshot, significance };
-  }
-
-  // Stage 3 — Safety (always before drafting)
+  // Stage 2 — Safety (before ANY LLM call)
   const safety = scanDiff(snapshot.diff);
   if (!safety.safe) {
     return { kind: "blocked_unsafe", snapshot, safety };
   }
 
-  // Stage 4 — Draft (receives the redacted diff via `safety`)
+  // Stage 3 — Significance (receives the redacted diff, never the raw one)
+  const significance = await assessSignificance(snapshot, safety.redactedDiff, config);
+  if (!options.force && !meetsThreshold(significance, config)) {
+    return { kind: "not_significant", snapshot, significance };
+  }
+
+  // Stage 4 — Draft (also receives the redacted diff via `safety`)
   const draftSet = await draft(snapshot, significance, safety, config);
 
   // Stage 5 — Queue

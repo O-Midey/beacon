@@ -1,4 +1,4 @@
-import { complete, extractJson } from "../lib/anthropic.js";
+import { complete, extractJson } from "../lib/llm/index.js";
 import {
   BeaconError,
   SignificanceResultSchema,
@@ -27,14 +27,18 @@ Respond with exactly this JSON shape and nothing else:
 
 const EXCERPT_CHARS = 1500;
 
-/** Build the compact user message. Exported for testing/inspection. */
-export function buildSignificancePrompt(snapshot: WorkspaceSnapshot): string {
+/**
+ * Build the compact user message. Takes the REDACTED diff (safety runs before
+ * significance, so no raw secret ever reaches this LLM call). Exported for
+ * testing/inspection.
+ */
+export function buildSignificancePrompt(snapshot: WorkspaceSnapshot, redactedDiff: string): string {
   const fileList = snapshot.filesChanged.slice(0, 40).join("\n");
   const moreFiles =
     snapshot.filesChanged.length > 40
       ? `\n…and ${snapshot.filesChanged.length - 40} more files`
       : "";
-  const excerpt = snapshot.diff.slice(0, EXCERPT_CHARS);
+  const excerpt = redactedDiff.slice(0, EXCERPT_CHARS);
 
   return `Repo: ${snapshot.repoName}
 Commit message:
@@ -53,12 +57,13 @@ ${excerpt}`;
  */
 export async function assessSignificance(
   snapshot: WorkspaceSnapshot,
+  redactedDiff: string,
   config: BeaconConfig,
 ): Promise<SignificanceResult> {
   const text = await complete({
     config,
     system: SYSTEM_PROMPT,
-    user: buildSignificancePrompt(snapshot),
+    user: buildSignificancePrompt(snapshot, redactedDiff),
     maxTokens: 512,
   });
 

@@ -29,14 +29,14 @@ There is no server, no database, and no cloud sync. Two JSON files under `~/.bea
 The pipeline is five strictly-separated stages:
 
 ```
-capture → significance → safety → draft → queue
+capture → safety → significance → draft → queue
 ```
 
 | Stage | What it does |
 |---|---|
 | **Capture** | Reads `git diff HEAD~1 HEAD`, the commit message, and changed-file stats into a typed snapshot. Diff is truncated for cost control. |
-| **Significance** | An LLM call scores the commit 0–10. Routine changes fall below the threshold (default: 6) and are skipped. |
-| **Safety** | Regex-only scan (no LLM) for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. **Critical findings block drafting; warnings are redacted.** |
+| **Safety** | Regex-only scan (no LLM) for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. Runs before *any* LLM call. **Critical findings block drafting; warnings are redacted.** |
+| **Significance** | An LLM call scores the commit 0–10 (on the redacted diff). Routine changes fall below the threshold (default: 6) and are skipped. |
 | **Draft** | A single LLM call produces all three platform drafts in your voice, receiving only the redacted diff. |
 | **Queue** | Drafts are persisted atomically to `~/.beacon/queue.json` (capped at 50 entries) for `beacon review`. |
 
@@ -57,7 +57,7 @@ Requires **Node.js 20+**.
 ## Setup
 
 ```bash
-# Store your Anthropic API key (written to ~/.beacon/config.json, mode 0600)
+# Default provider is Anthropic. Store your key (written to ~/.beacon/config.json, mode 0600)
 beacon config set api-key sk-ant-...
 # …or export ANTHROPIC_API_KEY in your shell (takes precedence)
 
@@ -65,6 +65,17 @@ beacon config set significance-threshold 6
 beacon config set model claude-sonnet-4-6
 beacon config set author-notes "Prefers dry humor; avoid hashtags on LinkedIn."
 beacon config show   # API key is masked
+```
+
+### Using a different provider
+
+Beacon also supports any **OpenAI-compatible** endpoint (OpenAI, OpenRouter, Groq, Together, a local server, …):
+
+```bash
+beacon config set provider openai
+beacon config set model gpt-4o-mini
+beacon config set base-url https://api.openai.com/v1   # or e.g. https://openrouter.ai/api/v1
+beacon config set api-key sk-...                       # or export OPENAI_API_KEY
 ```
 
 ---
@@ -101,11 +112,13 @@ All config lives in `~/.beacon/config.json` (mode `0600`).
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `apiKey` | `""` | `ANTHROPIC_API_KEY` env var overrides it. |
+| `provider` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible endpoint). |
+| `apiKey` | `""` | Provider env var (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) overrides it. |
+| `baseUrl` | — | Base URL for the `openai` provider. Ignored for `anthropic`. |
 | `significanceThreshold` | `6` | Minimum score (0–10) to draft. Lower = more drafts. |
 | `authorNotes` | — | Appended to the drafter's voice prompt. |
 | `platforms` | all `true` | Toggle `twitter` / `linkedin` / `devto` individually. |
-| `model` | `claude-sonnet-4-6` | Any Claude model ID. |
+| `model` | `claude-sonnet-4-6` | Model ID for the active provider. |
 | `maxDiffChars` | `8000` | Diff truncation limit before LLM calls. |
 
 ---
@@ -125,7 +138,7 @@ src/
   cli/         Commander entry point + commands (run, install, review, draft, config)
   pipeline/    The five stages + a thin orchestrator (index.ts)
   platforms/   Per-platform prompt config + output schema
-  lib/         Git, config, Anthropic client, formatting, paths, logger
+  lib/         Git, config, LLM providers (llm/: anthropic + openai), formatting, paths, logger
   types/       All shared types + Zod schemas + BeaconError
 tests/         Vitest specs (safety, git, queue, significance, drafter)
 hooks/         post-commit template

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const completeMock = vi.fn<(req: unknown) => Promise<string>>();
 
-vi.mock("../../src/lib/anthropic.js", async (importActual) => {
-  const actual = await importActual<typeof import("../../src/lib/anthropic.js")>();
+vi.mock("../../src/lib/llm/index.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../src/lib/llm/index.js")>();
   return { ...actual, complete: completeMock };
 });
 

@@ -58,16 +58,24 @@ export function saveConfig(config: BeaconConfig): void {
   chmodSync(path, FILE_MODE);
 }
 
+/** Env var checked first for each provider. */
+const PROVIDER_ENV: Record<BeaconConfig["provider"], string> = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+};
+
 /**
- * Resolve the API key with env var taking precedence over stored config.
- * Throws CONFIG_MISSING if neither is set, so LLM stages fail loudly.
+ * Resolve the API key for the configured provider. A provider-specific env var
+ * takes precedence over the stored config key. Throws CONFIG_MISSING if neither
+ * is set, so LLM stages fail loudly.
  */
 export function resolveApiKey(config: BeaconConfig): string {
-  const fromEnv = process.env.ANTHROPIC_API_KEY?.trim();
+  const envName = PROVIDER_ENV[config.provider];
+  const fromEnv = process.env[envName]?.trim();
   if (fromEnv) return fromEnv;
   if (config.apiKey.trim()) return config.apiKey.trim();
   throw new BeaconError(
-    "No Anthropic API key found. Set ANTHROPIC_API_KEY or run `beacon config set api-key <key>`.",
+    `No API key found for provider "${config.provider}". Set ${envName} or run \`beacon config set api-key <key>\`.`,
     "CONFIG_MISSING",
   );
 }

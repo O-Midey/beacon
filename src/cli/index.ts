@@ -13,12 +13,16 @@ import { runCommand } from "./commands/run.js";
  * friendly stderr messages; `run` swallows non-critical errors into the log.
  */
 
+// Replaced at build time by tsup `define`; falls back when run un-bundled.
+declare const __BEACON_VERSION__: string;
+const VERSION = typeof __BEACON_VERSION__ !== "undefined" ? __BEACON_VERSION__ : "0.0.0-dev";
+
 const program = new Command();
 
 program
   .name("beacon")
   .description("Local build-in-public content generator. Watches git commits and drafts posts.")
-  .version("0.1.0");
+  .version(VERSION);
 
 program
   .command("run")
@@ -60,7 +64,9 @@ const config = program.command("config").description("Manage Beacon configuratio
 
 config
   .command("set <field> [values...]")
-  .description("Set a config value (api-key, significance-threshold, author-notes, model, platform).")
+  .description(
+    "Set a config value (provider, api-key, base-url, significance-threshold, author-notes, model, platform).",
+  )
   .action((field: string, values: string[] = []) => {
     runInteractive(() => configSetCommand(field, values));
   });

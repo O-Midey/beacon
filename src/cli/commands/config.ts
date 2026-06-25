@@ -1,17 +1,37 @@
 import { loadConfig, maskKey, saveConfig } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
-import { BeaconError, type PlatformName } from "../../types/index.js";
+import { BeaconError, ProviderNameSchema, type PlatformName } from "../../types/index.js";
 
 /**
  * `beacon config` — manage `~/.beacon/config.json`.
  *
+ *   beacon config set provider <anthropic|openai>
  *   beacon config set api-key <key>
+ *   beacon config set base-url <url>            (OpenAI-compatible only)
  *   beacon config set significance-threshold <0-10>
  *   beacon config set author-notes <text...>
  *   beacon config set model <model>
  *   beacon config set platform <twitter|linkedin|devto> <on|off>
  *   beacon config show
  */
+
+function setProvider(value: string): void {
+  const parsed = ProviderNameSchema.safeParse(value.trim());
+  if (!parsed.success) {
+    throw new BeaconError("provider must be one of: anthropic, openai", "CONFIG_MISSING");
+  }
+  const config = loadConfig();
+  config.provider = parsed.data;
+  saveConfig(config);
+  logger.success(`provider set to ${parsed.data}`);
+}
+
+function setBaseUrl(value: string): void {
+  const config = loadConfig();
+  config.baseUrl = value.trim();
+  saveConfig(config);
+  logger.success(`base-url set to ${config.baseUrl}`);
+}
 
 function setApiKey(value: string): void {
   const config = loadConfig();
@@ -70,6 +90,14 @@ function show(): void {
 export function configSetCommand(field: string, values: string[]): void {
   const value = values.join(" ");
   switch (field) {
+    case "provider":
+      requireValue(field, value);
+      setProvider(value);
+      return;
+    case "base-url":
+      requireValue(field, value);
+      setBaseUrl(value);
+      return;
     case "api-key":
       requireValue(field, value);
       setApiKey(value);
@@ -95,7 +123,7 @@ export function configSetCommand(field: string, values: string[]): void {
     }
     default:
       throw new BeaconError(
-        `Unknown config field: ${field}. Valid: api-key, significance-threshold, author-notes, model, platform`,
+        `Unknown config field: ${field}. Valid: provider, api-key, base-url, significance-threshold, author-notes, model, platform`,
         "CONFIG_MISSING",
       );
   }

@@ -1,10 +1,10 @@
 {
   "name": "beacon-bip",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Beacon — a local CLI that watches your git workspace and auto-drafts build-in-public content for Twitter/X, LinkedIn, and dev.to.",
   "type": "module",
   "bin": {
-    "beacon": "./dist/index.js"
+    "beacon": "dist/index.js"
   },
   "files": [
     "dist",

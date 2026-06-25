@@ -169,8 +169,18 @@ export type PlatformToggles = z.infer<typeof PlatformTogglesSchema>;
 
 export type PlatformName = keyof PlatformToggles;
 
+/** Supported LLM providers. `openai` covers any OpenAI-compatible endpoint. */
+export const ProviderNameSchema = z.enum(["anthropic", "openai"]);
+export type ProviderName = z.infer<typeof ProviderNameSchema>;
+
 export const BeaconConfigSchema = z.object({
+  provider: ProviderNameSchema.default("anthropic"),
   apiKey: z.string().default(""),
+  /**
+   * Base URL for OpenAI-compatible providers (OpenAI, OpenRouter, Groq,
+   * Together, a local server, …). Ignored for the `anthropic` provider.
+   */
+  baseUrl: z.string().optional(),
   significanceThreshold: z.number().min(0).max(10).default(6),
   authorNotes: z.string().optional(),
   platforms: PlatformTogglesSchema.default({

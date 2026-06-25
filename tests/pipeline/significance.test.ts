@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The anthropic lib is mocked: `complete` is a spy, `extractJson` keeps its real
+ * The LLM facade is mocked: `complete` is a spy, `extractJson` keeps its real
  * implementation. No real API calls.
  */
 const completeMock = vi.fn<(req: unknown) => Promise<string>>();
 
-vi.mock("../../src/lib/anthropic.js", async (importActual) => {
-  const actual = await importActual<typeof import("../../src/lib/anthropic.js")>();
+vi.mock("../../src/lib/llm/index.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../src/lib/llm/index.js")>();
   return { ...actual, complete: completeMock };
 });
 
@@ -35,11 +35,12 @@ const snapshot: WorkspaceSnapshot = {
 beforeEach(() => completeMock.mockReset());
 
 describe("buildSignificancePrompt", () => {
-  it("includes the commit message and file list but not the full diff label", () => {
-    const prompt = buildSignificancePrompt(snapshot);
+  it("includes the commit message and file list, using the redacted diff", () => {
+    const prompt = buildSignificancePrompt(snapshot, "+const x = '[REDACTED]';");
     expect(prompt).toContain("Add auth pipeline");
     expect(prompt).toContain("src/auth.ts");
     expect(prompt).toContain("excerpt");
+    expect(prompt).toContain("[REDACTED]");
   });
 });
 
@@ -61,14 +62,14 @@ describe("assessSignificance", () => {
     completeMock.mockResolvedValue(
       '```json\n{"isSignificant":true,"score":8,"reason":"feature","suggestedAngles":["a","b"]}\n```',
     );
-    const result = await assessSignificance(snapshot, config);
+    const result = await assessSignificance(snapshot, snapshot.diff, config);
     expect(result.score).toBe(8);
     expect(result.suggestedAngles).toEqual(["a", "b"]);
   });
 
   it("throws API_ERROR on malformed schema", async () => {
     completeMock.mockResolvedValue('{"score":"high"}');
-    await expect(assessSignificance(snapshot, config)).rejects.toSatisfy(
+    await expect(assessSignificance(snapshot, snapshot.diff, config)).rejects.toSatisfy(
       (e: unknown) => isBeaconError(e) && e.code === "API_ERROR",
     );
   });

@@ -1,4 +1,4 @@
-import { complete, extractJson } from "../lib/anthropic.js";
+import { complete, extractJson } from "../lib/llm/index.js";
 import { platforms } from "../platforms/index.js";
 import {
   BeaconError,
