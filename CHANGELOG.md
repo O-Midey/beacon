@@ -19,6 +19,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - README pipeline description now matches the actual stage order (secret
   scanner before the significance filter, as of 0.2.0).
+- Site favicon now adapts to dark browser chrome — transparent background and
+  a `prefers-color-scheme` media query inside the SVG flip the black strokes
+  to cream in dark mode.
 
 ## [0.3.0] - 2026-07-04
 
