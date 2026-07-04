@@ -14,6 +14,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file at build time.
 - **README demo GIF** (`assets/demo.gif`) — `beacon init` → commit →
   `beacon review`, recorded with vhs against a local mock model.
+- **Rotating hero headline** on the site — "Beacon drafts …" cycles through
+  all five platforms in a yellow sticker box; static under
+  `prefers-reduced-motion`.
 
 ### Fixed
 

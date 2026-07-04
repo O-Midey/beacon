@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CopyButton } from "@/components/CopyButton";
 import { RevealObserver } from "@/components/RevealObserver";
+import { RotatingWord } from "@/components/RotatingWord";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -26,7 +27,18 @@ export default function LandingPage() {
               <path d="M16 2 L19 12 L30 12 L21 18 L24 29 L16 22 L8 29 L11 18 L2 12 L13 12 Z" fill="#FFC900" stroke="#000" strokeWidth="1.6" />
             </svg>
 
-            <h1 className="rise">You ship. Beacon drafts the tweet.</h1>
+            <h1 className="rise">
+              You ship. Beacon drafts{" "}
+              <RotatingWord
+                words={[
+                  "the tweet.",
+                  "the LinkedIn post.",
+                  "the dev.to article.",
+                  "the Bluesky post.",
+                  "the Mastodon toot.",
+                ]}
+              />
+            </h1>
             <p className="lede rise" style={{ "--d": ".12s" } as React.CSSProperties}>
               Beacon turns your git commits into build-in-public drafts — locally, privately, and never
               posted without you. You review, you approve, you stay in control.
