@@ -1,0 +1,13 @@
+export const metadata = { title: "Privacy & security" };
+
+# Privacy & security
+
+The security model is architectural, not a promise.
+
+<ul className="sec-cards">
+  <li><strong>Scanner first, always.</strong> The regex secret scanner runs before any LLM call. The model never sees the raw diff — only a redacted, truncated version.</li>
+  <li><strong>Critical findings abort drafting.</strong> A leaked key (e.g. sk-ant-…) stops the pipeline for that commit and logs which lines triggered it.</li>
+  <li><strong>Keys stay on your machine.</strong> Env var or the 0600 config file — nowhere else.</li>
+  <li><strong>No server, no database, no cloud sync.</strong> Beacon&apos;s entire footprint is two JSON files under ~/.beacon/ plus a log at ~/.beacon/beacon.log. No telemetry, no accounts.</li>
+  <li><strong>No posting credentials.</strong> Beacon cannot publish anything. Approving a draft copies it to your clipboard — that&apos;s the only way content leaves the tool.</li>
+</ul>

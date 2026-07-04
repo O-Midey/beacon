@@ -1,0 +1,26 @@
+export const metadata = { title: "Configuration" };
+
+# Configuration
+
+Everything lives in `~/.beacon/config.json` (file mode 0600). Set values with `beacon config set <key> <value>`.
+
+<div className="tablebox">
+  <table className="cfg">
+    <thead>
+      <tr><th>Key</th><th>Default</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>`provider`</td><td>`anthropic`</td><td>anthropic or openai (any OpenAI-compatible endpoint, incl. Ollama)</td></tr>
+      <tr><td>`apiKey`</td><td>`""`</td><td>Env vars ANTHROPIC_API_KEY / OPENAI_API_KEY override it</td></tr>
+      <tr><td>`baseUrl`</td><td>—</td><td>For the openai provider (e.g. `https://openrouter.ai/api/v1`)</td></tr>
+      <tr><td>`significanceThreshold`</td><td>`6`</td><td>0–10; lower = more drafts</td></tr>
+      <tr><td>`authorName`</td><td>—</td><td>Identity for the drafter prompt</td></tr>
+      <tr><td>`authorBio`</td><td>—</td><td>Short bio that shapes every draft</td></tr>
+      <tr><td>`authorNotes`</td><td>—</td><td>Voice notes: tone, phrases, things to avoid</td></tr>
+      <tr><td>`language`</td><td>`English`</td><td>Any language name works</td></tr>
+      <tr><td>`platforms`</td><td>twitter, linkedin, devto on</td><td>bluesky, mastodon off by default. Toggle: `beacon config set platform <name> <on|off>`</td></tr>
+      <tr><td>`model`</td><td>`claude-sonnet-4-6`</td><td>Model ID for the active provider</td></tr>
+      <tr><td>`maxDiffChars`</td><td>`8000`</td><td>Diff truncation before LLM calls</td></tr>
+    </tbody>
+  </table>
+</div>

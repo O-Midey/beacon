@@ -1,0 +1,39 @@
+export const metadata = { title: "Providers" };
+
+# Providers
+
+Anthropic by default, any OpenAI-compatible endpoint, or fully local with Ollama.
+
+## Anthropic (default)
+
+```bash
+beacon config set api-key sk-ant-...
+# or: export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+## OpenAI-compatible
+
+Works with OpenAI, OpenRouter, Groq, Together, or any local server speaking the OpenAI API.
+
+```bash
+beacon config set provider openai
+beacon config set model gpt-4o
+beacon config set base-url https://openrouter.ai/api/v1
+beacon config set api-key sk-or-...
+```
+
+## Ollama (fully local, zero cost)
+
+With a local model, your diff never leaves your machine at all. No key needed.
+
+```bash
+ollama pull llama3.1
+beacon config set provider openai
+beacon config set base-url http://localhost:11434/v1
+beacon config set model llama3.1
+beacon config set api-key ollama
+```
+
+<div className="callout callout-t">
+  Fully offline. Zero cost. Your code never touches a network.
+</div>

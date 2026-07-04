@@ -1,0 +1,61 @@
+export const metadata = { title: "Commands" };
+
+# Commands
+
+Six commands. You'll mostly use two.
+
+## beacon init
+
+Guided setup: provider, API key, voice, and language. Installs the post-commit hook, and drafts from your latest commit before setup even finishes.
+
+```bash
+beacon init
+```
+
+## beacon install
+
+Installs the post-commit hook in the current repo — for repos you add after init.
+
+```bash
+cd your-repo
+beacon install
+```
+
+## beacon draft
+
+Manual draft from the latest commit — or a digest across many.
+
+```bash
+beacon draft                        # latest commit
+beacon draft --message "shipped v2" # from freeform text
+beacon draft --file notes.md        # from a file
+beacon draft --today                # digest of today
+beacon draft --week                 # "here's what I shipped"
+beacon draft --since "3 days ago"   # anything git log --since accepts
+```
+
+## beacon review
+
+Interactive queue. Shows the significance score and every drafted platform for each entry.
+
+- **approve** — copies the draft to your clipboard
+- **edit** — opens $EDITOR on plain text, validated on save
+- **discard** — removes it from the queue
+- **skip** — leaves it for later
+
+## beacon config set
+
+Set any config key. See [Configuration](/docs/configuration) for the full list.
+
+```bash
+beacon config set significance-threshold 5
+beacon config set platform bluesky on
+```
+
+## beacon doctor
+
+Health check: node, git, config, hook, PATH, and a live provider ping. Run this first when anything misbehaves.
+
+```bash
+beacon doctor
+```

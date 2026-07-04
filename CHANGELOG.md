@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Production website** (`site/`) — Next.js App Router port of the project
+  site, deployed at <https://beacon-bip.vercel.app> with push-to-deploy from
+  `main`. Docs are MDX pages; the changelog timeline is generated from this
+  file at build time.
+- **README demo GIF** (`assets/demo.gif`) — `beacon init` → commit →
+  `beacon review`, recorded with vhs against a local mock model.
+
+### Fixed
+
+- README pipeline description now matches the actual stage order (secret
+  scanner before the significance filter, as of 0.2.0).
+
 ## [0.3.0] - 2026-07-04
 
 ### Added

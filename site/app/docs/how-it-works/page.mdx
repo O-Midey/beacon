@@ -1,0 +1,25 @@
+export const metadata = { title: "How it works" };
+
+# How it works
+
+Beacon runs as a git post-commit hook. Every commit flows through five strictly separated stages — each one exists so the next can be trusted.
+
+## 1 · Capture
+
+The commit's diff, message, and changed-file stats are read into a typed snapshot. The diff is truncated at ~8k characters (configurable via `maxDiffChars`) to keep LLM costs predictable.
+
+## 2 · Safety
+
+A regex-only secret scanner runs **before any LLM call**. It detects API keys, private-key headers, JWTs, DB connection strings, .env assignments, private IPs, and internal hostnames. Critical findings block drafting entirely; warnings are redacted from everything the model sees. The model never sees the raw diff.
+
+## 3 · Significance
+
+An LLM scores the commit 0–10 on the redacted diff. Routine changes — typo fixes, dep bumps, refactors — below your threshold (default 6) are skipped. No noise in your queue.
+
+## 4 · Draft
+
+One LLM call produces drafts for every enabled platform, shaped by your name, bio, voice notes, and language from config.
+
+## 5 · Queue
+
+Drafts persist atomically to `~/.beacon/queue.json`, capped at 50 entries. They wait there until you run `beacon review`.

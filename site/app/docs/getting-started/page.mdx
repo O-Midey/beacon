@@ -1,0 +1,38 @@
+export const metadata = { title: "Getting started" };
+
+# Getting started
+
+From zero to your first draft in about two minutes.
+
+## Requirements
+
+- Node ≥ 20
+- git
+
+## Install
+
+```bash
+npm install -g beacon-bip
+```
+
+## Set up
+
+```bash
+beacon init
+```
+
+The guided setup walks you through your provider, API key, voice, and language, then installs the post-commit hook in your repo. It even drafts from your latest commit before setup finishes — so you see the result immediately.
+
+## Then just work
+
+Commit as usual. When there's something worth posting, Beacon queues drafts in the background. Review them whenever you like:
+
+```bash
+git commit -m "feat: the thing you built"
+beacon review
+```
+
+<div className="callout callout-y">
+  <strong>Nothing posts automatically.</strong> Approving a draft copies it to your clipboard — Beacon
+  has no credentials for your social accounts.
+</div>

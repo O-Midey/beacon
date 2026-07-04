@@ -1,0 +1,36 @@
+export const metadata = { title: "Troubleshooting" };
+
+# Troubleshooting
+
+Start with the doctor — it checks node, git, config, hook, PATH, and pings your provider live.
+
+```bash
+beacon doctor
+```
+
+Logs live at `~/.beacon/beacon.log`.
+
+## Common fixes
+
+<div className="sec-cards">
+  <div>
+    <p className="fix-t">The hook isn&apos;t firing after commits</p>
+    <p className="fix-p">Run `beacon install` again in the repo — another tool may have overwritten the post-commit hook.</p>
+  </div>
+  <div>
+    <p className="fix-t">No drafts are showing up</p>
+    <p className="fix-p">Your commits may be scoring below the threshold. Lower it: `beacon config set significance-threshold 4`.</p>
+  </div>
+  <div>
+    <p className="fix-t">Provider errors</p>
+    <p className="fix-p">`beacon doctor` does a live provider ping. Check your API key (env vars override config) and, for openai providers, the base-url.</p>
+  </div>
+  <div>
+    <p className="fix-t">beacon: command not found</p>
+    <p className="fix-p">Your npm global bin isn&apos;t on PATH. `npm bin -g` shows where it is; add that to your shell profile. `beacon doctor` checks this too.</p>
+  </div>
+  <div>
+    <p className="fix-t">A commit with a secret was blocked — now what?</p>
+    <p className="fix-p">That&apos;s by design. Rotate the secret, clean up the commit, and draft manually afterwards with `beacon draft`. The log shows which lines triggered the block.</p>
+  </div>
+</div>

@@ -2,11 +2,16 @@
 
 > Auto-draft build-in-public content from your git commits — locally, privately, never auto-posted.
 
+[![npm](https://img.shields.io/npm/v/beacon-bip?color=FFC900)](https://www.npmjs.com/package/beacon-bip)
 [![Node.js ≥20](https://img.shields.io/badge/node-%3E%3D20-brightgreen?logo=node.js)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178c6?logo=typescript)](https://www.typescriptlang.org)
 
-Beacon installs a `post-commit` git hook that reads your diff and commit message, runs it through a **significance filter → secret scanner → voice drafter**, and writes platform-specific drafts to a local review queue for **Twitter/X**, **LinkedIn**, **dev.to**, **Bluesky**, and **Mastodon**.
+**[Website](https://beacon-bip.vercel.app)** · **[Docs](https://beacon-bip.vercel.app/docs/getting-started)** · **[Changelog](https://beacon-bip.vercel.app/changelog)**
+
+![beacon init, a commit drafting in the background, and beacon review approving a draft to the clipboard](https://raw.githubusercontent.com/O-Midey/beacon/main/assets/demo.gif)
+
+Beacon installs a `post-commit` git hook that reads your diff and commit message, runs it through a **secret scanner → significance filter → voice drafter**, and writes platform-specific drafts to a local review queue for **Twitter/X**, **LinkedIn**, **dev.to**, **Bluesky**, and **Mastodon**.
 
 **Nothing is ever published automatically.** You always review, edit, approve, or discard before anything leaves your machine.
 
