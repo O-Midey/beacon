@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-07-04
+
 ### Added
 
 - **Production website** (`site/`) — Next.js App Router port of the project
@@ -27,9 +29,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   screen.
 - The beacon GitHub repository is now public (required for the README GIF,
   npm page image, and every "Star on GitHub" link to work).
+- CI now runs the CLI checks on a Node 20 + 22 matrix and builds the site as
+  a second job.
 
 ### Fixed
 
+- **`punycode` DeprecationWarning (DEP0040) no longer pollutes CLI output** on
+  Node ≥ 21 — upgraded `@anthropic-ai/sdk` 0.32.1 → 0.110.0, which uses native
+  fetch and drops the `node-fetch → whatwg-url → punycode` chain entirely.
 - README pipeline description now matches the actual stage order (secret
   scanner before the significance filter, as of 0.2.0).
 - Site favicon now adapts to dark browser chrome — transparent background and

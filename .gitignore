@@ -8,3 +8,6 @@ coverage/
 tsup.config.bundled_*.mjs
 
 .vercel
+
+# Claude Code session permissions — local only
+.claude/settings.json
