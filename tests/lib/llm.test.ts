@@ -75,14 +75,14 @@ describe("OpenAiProvider", () => {
     expect((init as RequestInit).headers).toMatchObject({ authorization: "Bearer test-key" });
   });
 
-  it("throws API_ERROR on a non-OK status", async () => {
+  it("throws AUTH_ERROR on a 401 status", async () => {
     const fetchMock = vi.fn(async () => new Response("nope", { status: 401 }));
     const p = new OpenAiProvider(
       cfg({ provider: "openai", model: "x" }),
       fetchMock as unknown as typeof fetch,
     );
     await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).rejects.toMatchObject({
-      code: "API_ERROR",
+      code: "AUTH_ERROR",
     });
   });
 

@@ -1,0 +1,1223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Beacon — you ship, Beacon drafts the tweet</title>
+<style>
+  :root{
+    --paper:#F4F4F0; --ink:#000; --y:#FFC900; --p:#FF90E8; --t:#23A094;
+    --dark:#171714; --term-fg:#E8E6DF;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --sans:'Helvetica Neue',Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html{scroll-padding-top:96px;scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--y)}
+  a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #000;outline-offset:3px}
+  .wrap{max-width:1200px;margin:0 auto;padding-left:20px;padding-right:20px}
+  .skip{position:absolute;left:-9999px;top:0;background:#000;color:#fff;padding:8px 12px;z-index:100;font-weight:700;text-decoration:none}
+  .skip:focus{left:8px;top:8px}
+
+  /* ---------- signature press interaction ---------- */
+  .press{border:2px solid #000;box-shadow:4px 4px 0 #000;transition:transform .12s ease,box-shadow .12s ease;text-decoration:none;display:inline-block;cursor:pointer}
+  .press:hover{transform:translate(4px,4px);box-shadow:0 0 0 rgba(0,0,0,0)}
+  .press:active{transform:translate(5px,5px);box-shadow:0 0 0 rgba(0,0,0,0)}
+  .btn{padding:10px 16px;font-weight:700;font-size:14px;font-family:var(--sans)}
+  .btn-dark{background:#000;color:#fff}
+  .btn-y{background:var(--y);color:#000}
+
+  /* cards lift toward the reader on hover — inverse of the press */
+  .lift{transition:transform .16s ease,box-shadow .16s ease}
+  .lift:hover{transform:translate(-3px,-3px);box-shadow:8px 8px 0 #000}
+
+  /* ---------- header ---------- */
+  .site-head{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:2px solid #000}
+  .head-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px}
+  .logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:#000;font-weight:800;font-size:22px;letter-spacing:-.02em}
+  .beam{animation:beam 2.6s ease-in-out infinite}
+  .beam-r{animation-delay:1.3s}
+  @keyframes beam{0%,100%{opacity:1}50%{opacity:.12}}
+  .head-menu{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-left:auto;min-width:0}
+  .head-nav{display:flex;gap:2px;flex-wrap:wrap;align-items:center}
+  .navlink{position:relative;color:#000;text-decoration:none;font-weight:700;font-size:15px;padding:8px 12px}
+  .navlink::after{content:"";position:absolute;left:12px;right:100%;bottom:3px;height:3px;background:var(--y);transition:right .2s ease}
+  .navlink:hover::after{right:12px}
+  .head-cta{display:flex;gap:12px;flex-wrap:wrap}
+  .nav-toggle{display:none;align-items:center;justify-content:center;width:42px;height:42px;padding:0;border:2px solid #000;background:var(--y);box-shadow:3px 3px 0 #000;font-size:19px;font-weight:800;font-family:var(--sans);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease}
+  .nav-toggle:active{transform:translate(3px,3px);box-shadow:0 0 0 rgba(0,0,0,0)}
+  .mini-badge{border:2px solid #000;font-size:12px;font-weight:800;padding:3px 8px;margin-left:2px;transform:rotate(-2deg);display:inline-block}
+
+  /* ---------- entrance + scroll-reveal ---------- */
+  @keyframes rise{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  .rise{animation:rise .65s cubic-bezier(.2,.7,.3,1) both;animation-delay:var(--d,0s)}
+  .reveal{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s cubic-bezier(.2,.7,.3,1);transition-delay:var(--d,0s)}
+  .reveal.in{opacity:1;transform:none}
+
+  /* ---------- hero ---------- */
+  .sec{border-bottom:2px solid #000}
+  .hero-inner{padding-top:64px;padding-bottom:80px;position:relative}
+  .hero-grid{display:grid;grid-template-columns:1.04fr .96fr;gap:56px;align-items:center}
+  .hero-inner h1{font-weight:800;font-size:clamp(2.5rem,4.9vw,4.4rem);line-height:1.04;letter-spacing:-.035em;margin-bottom:22px;text-wrap:balance}
+  .hero-inner .lede{font-size:clamp(1.05rem,1.6vw,1.25rem);line-height:1.55;margin-bottom:28px;max-width:52ch}
+
+  /* rotating platform word — box is sized once to the widest word so the
+     headline never re-wraps; only the word flips and the color changes */
+  .flip{display:inline-block;border:2px solid #000;background:var(--y);box-shadow:4px 4px 0 #000;overflow:hidden;white-space:nowrap;text-align:center;vertical-align:-.16em;transition:background-color .32s ease,color .32s ease}
+  .flip .fw{display:inline-block;padding:.02em .16em;line-height:1.16;transition:transform .22s ease,opacity .22s ease}
+  .fw.flip-out{transform:translateY(-112%);opacity:0}
+  .fw.flip-in{transition:none;transform:translateY(112%);opacity:0}
+
+  .hero-copy{min-width:0}
+  .hero-side{position:relative;min-width:0}
+  .plat-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .plat-label{font-family:var(--mono);font-size:13px;font-weight:600;color:#55534B}
+  .chip{border:2px solid #000;background:#fff;font-weight:800;font-size:13px;padding:4px 10px;box-shadow:3px 3px 0 #000}
+  .plat-row .chip:nth-child(odd){rotate:-1.5deg}
+  .plat-row .chip:nth-child(even){rotate:1.5deg}
+  .sticker{position:absolute;border:2px solid #000;padding:8px 14px;font-weight:800;font-size:13px;box-shadow:4px 4px 0 #000}
+  .bob{animation:bob 5.5s ease-in-out infinite}
+  .bob-2{animation:bob 6.5s ease-in-out infinite;animation-delay:1.2s}
+  @keyframes bob{0%,100%{translate:0 0}50%{translate:0 -7px}}
+  .star{position:absolute;animation:spin 18s linear infinite}
+  @keyframes spin{to{transform:rotate(372deg)}}
+
+  .install-row{display:flex;align-items:stretch;flex-wrap:wrap;margin-bottom:24px}
+  .cmd{display:flex;align-items:center;border:2px solid #000;background:var(--dark);color:var(--paper);padding:14px 18px;font-family:var(--mono);font-weight:600;font-size:clamp(13px,2.6vw,16px);box-shadow:5px 5px 0 #000}
+  .cmd-copy{border:2px solid #000;border-left:none;background:var(--y);color:#000;padding:14px 18px;font-weight:800;font-size:14px;cursor:pointer;box-shadow:5px 5px 0 #000;font-family:var(--sans);transition:transform .12s ease,box-shadow .12s ease}
+  .cmd-copy:hover{transform:translate(4px,4px);box-shadow:0 0 0 rgba(0,0,0,0)}
+  @keyframes pop{0%{transform:scale(1)}45%{transform:scale(1.14)}100%{transform:scale(1)}}
+  .copied-pop{animation:pop .3s ease}
+
+  /* ---------- terminal ---------- */
+  .term{border:2px solid #000;background:var(--dark);box-shadow:8px 8px 0 #000;max-width:780px;min-width:0}
+  .termbar{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:2px solid #000;background:var(--paper)}
+  .dot{width:13px;height:13px;border-radius:50%;border:2px solid #000;display:inline-block}
+  .termbar .label{font-family:var(--mono);font-size:12.5px;font-weight:600;margin-left:8px;color:#000}
+  .term pre{margin:0;padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;line-height:1.75;color:var(--term-fg)}
+  .c-y{color:#FFD84D}.c-p{color:var(--p)}.c-g{color:#57D9AD}.c-dim{color:#8A877D}
+  .tl{opacity:0;animation:tline .05s linear both;animation-delay:var(--i,0s)}
+  @keyframes tline{to{opacity:1}}
+  .cursor{display:inline-block;width:9px;height:15px;background:var(--term-fg);vertical-align:-2px;opacity:0;animation:tline .05s linear both 4.4s,blink 1.1s steps(1) 4.4s infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ---------- ticker ---------- */
+  .ticker{background:var(--p);border-bottom:2px solid #000;overflow:hidden;padding:12px 0}
+  .ticker-track{display:flex;width:max-content;animation:ticker 78s linear infinite}
+  .ticker:hover .ticker-track{animation-play-state:paused}
+  .ticker-track span{font-weight:800;font-size:16px;letter-spacing:.02em;white-space:nowrap;padding-right:8px}
+  @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  /* ---------- sections ---------- */
+  .sec-pad{padding-top:72px;padding-bottom:72px}
+  .display{font-weight:800;font-size:clamp(1.9rem,4.5vw,3.2rem);letter-spacing:-.03em;line-height:1.05;text-wrap:balance}
+  .sec-head{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:36px}
+  .draw{stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .9s ease .25s}
+  .draw-head{opacity:0;transition:opacity .3s ease 1s}
+  .reveal.in .draw{stroke-dashoffset:0}
+  .reveal.in .draw-head{opacity:1}
+
+  .grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+  .grid-feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:20px}
+  .card{border:2px solid #000;background:#fff;box-shadow:5px 5px 0 #000;padding:20px}
+  .card p{font-size:15px;line-height:1.55}
+  .card h3{font-weight:800;font-size:19px;margin-bottom:8px}
+  .card .icon{margin-bottom:12px;display:block}
+  .badge{display:inline-block;border:2px solid #000;font-weight:800;font-size:13px;padding:4px 9px;margin-bottom:14px}
+  code.inline{font-family:var(--mono);font-size:13px;background:var(--paper);border:1px solid #000;padding:1px 5px}
+
+  .privacy{background:var(--y)}
+  .privacy-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:40px;align-items:center;padding-top:72px;padding-bottom:72px}
+  .privacy .lede-p{font-size:17px;line-height:1.6;margin-bottom:14px}
+  .rules{list-style:none;padding:0;display:grid;gap:10px}
+  .rules li{border:2px solid #000;background:var(--paper);padding:10px 14px;font-weight:700;font-size:15px;transition:transform .15s ease}
+  .rules li:hover{transform:translateX(5px)}
+
+  .providers{background:#fff}
+  .providers-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding-top:44px;padding-bottom:44px}
+  .chip{border:2px solid #000;padding:8px 14px;font-family:var(--mono);font-weight:600;font-size:14px;background:var(--paper);transition:transform .16s ease}
+  .chip:hover{transform:translateY(-4px) rotate(-1.5deg)}
+  .chip-t{background:var(--t);color:#fff;font-weight:700}
+
+  /* ---------- FAQ ---------- */
+  .faq-wrap{max-width:820px;margin:0 auto;padding:72px 20px}
+  .faq-list{display:grid;gap:14px}
+  details.faq{border:2px solid #000;background:#fff;box-shadow:4px 4px 0 #000}
+  details.faq summary{cursor:pointer;padding:16px 18px;font-weight:800;font-size:16.5px;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+  details.faq summary::-webkit-details-marker{display:none}
+  details.faq summary::after{content:"+";font-size:22px;font-weight:800;line-height:1;transition:transform .25s ease}
+  details.faq[open] summary::after{transform:rotate(45deg)}
+  details.faq p{padding:0 18px 16px;font-size:15.5px;line-height:1.6}
+  details.faq[open] p{animation:faqIn .3s ease}
+  @keyframes faqIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+  .cta{background:var(--p)}
+  .cta-inner{padding-top:80px;padding-bottom:80px;text-align:center}
+  .cta-inner h2{font-weight:800;font-size:clamp(2.1rem,5.5vw,4rem);letter-spacing:-.03em;line-height:1.02;margin-bottom:26px;text-wrap:balance}
+  .cta-btns{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+  .cta-cmd{background:#000;color:#fff;padding:16px 22px;font-family:var(--mono);font-weight:700;font-size:15px;box-shadow:5px 5px 0 #000}
+  .cta-docs{background:var(--y);color:#000;padding:16px 22px;font-weight:800;font-size:15px;box-shadow:5px 5px 0 #000}
+
+  /* ---------- footer ---------- */
+  .foot{background:var(--dark);color:var(--paper)}
+  .foot-row{display:flex;align-items:center;gap:20px;flex-wrap:wrap;font-size:14px;padding-top:26px;padding-bottom:26px}
+  .foot a{color:var(--paper);font-weight:700}
+  .foot-right{margin-left:auto;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .ver{border:2px solid var(--paper);background:transparent;color:var(--paper);font-family:var(--mono);font-weight:700;font-size:12.5px;padding:5px 10px;text-decoration:none;transition:background .15s ease,color .15s ease,transform .12s ease}
+  .ver:hover{background:var(--y);color:#000;border-color:var(--y);transform:translateY(-2px)}
+
+  /* ---------- docs ---------- */
+  .docs-grid{max-width:1200px;margin:0 auto;padding:32px 20px 90px;display:grid;grid-template-columns:250px minmax(0,1fr);gap:36px;align-items:start}
+  .sidebar{position:sticky;top:92px;border:2px solid #000;background:#fff;box-shadow:5px 5px 0 #000}
+  .menu-btn{display:none;width:100%;align-items:center;justify-content:space-between;padding:12px 16px;border:none;border-bottom:2px solid #000;background:var(--y);font-weight:800;font-size:15px;cursor:pointer;font-family:var(--sans)}
+  .docs-nav{display:block;padding:10px}
+  .docs-nav a{display:block;padding:10px 12px;margin:2px 0;font-weight:700;font-size:15px;line-height:1.2;color:#000;text-decoration:none;border:2px solid transparent;transition:transform .13s ease,background .13s ease,border-color .13s ease}
+  .docs-nav a:hover{background:var(--paper);border-color:#000;transform:translateX(4px)}
+  .docs-nav a[aria-current="page"]{background:var(--y);border-color:#000}
+  .docs-nav .nav-extra{margin-top:10px;padding-top:10px;border-top:2px solid #000;font-family:var(--mono);font-size:13.5px}
+  .docs-main{min-width:0;max-width:72ch}
+  .doc-page{display:none}
+  .doc-page.on{display:block;animation:rise .45s cubic-bezier(.2,.7,.3,1) both}
+  .doc-title{font-weight:800;font-size:clamp(2.1rem,5vw,3rem);letter-spacing:-.025em;line-height:1.05;margin-bottom:10px}
+  .doc-lede{font-size:17px;line-height:1.65;margin-bottom:22px}
+  .doc-h2{font-weight:800;font-size:1.35rem;margin:34px 0 10px}
+  .doc-p{font-size:16px;line-height:1.65;margin-bottom:14px}
+  .doc-ul{margin:0 0 14px;padding-left:22px;font-size:16px;line-height:1.8}
+  .codeblock{position:relative;border:2px solid #000;background:var(--dark);box-shadow:5px 5px 0 #000;margin:16px 0}
+  .codeblock pre{margin:0;padding:18px 20px;overflow-x:auto;font-family:var(--mono);font-size:13.5px;line-height:1.7;color:var(--term-fg)}
+  .copybtn{position:absolute;top:10px;right:10px;padding:6px 10px;border:2px solid #000;background:var(--y);color:#000;font-weight:800;font-size:12px;font-family:var(--mono);cursor:pointer;box-shadow:3px 3px 0 #000;transition:transform .12s ease,box-shadow .12s ease;z-index:1}
+  .copybtn:hover{transform:translate(3px,3px);box-shadow:0 0 0 rgba(0,0,0,0)}
+  .callout{border:2px solid #000;padding:14px 18px;margin:22px 0;font-size:15px;line-height:1.6}
+  .callout-y{background:var(--y)}
+  .callout-t{background:var(--t);color:#fff;font-weight:600}
+  .tablebox{border:2px solid #000;box-shadow:5px 5px 0 #000;overflow-x:auto;background:#fff;margin:20px 0}
+  .cfg{border-collapse:collapse;width:100%;min-width:640px;font-size:14.5px;line-height:1.5}
+  .cfg th{text-align:left;padding:11px 14px;border-bottom:2px solid #000;background:var(--y);font-weight:800;white-space:nowrap}
+  .cfg td{padding:10px 14px;border-bottom:1px solid #000;vertical-align:top}
+  .cfg tr:last-child td{border-bottom:none}
+  .cfg code{font-family:var(--mono);font-size:13px}
+  .cfg .k{font-weight:700}
+  .sec-cards{display:grid;gap:14px}
+  .sec-cards>li,.sec-cards>div{border:2px solid #000;background:#fff;box-shadow:4px 4px 0 #000;padding:16px 18px;font-size:15.5px;line-height:1.6}
+  .sec-cards{list-style:none;padding:0}
+  .fix-t{font-weight:800;font-size:15.5px;margin-bottom:6px}
+  .fix-p{font-size:15px;line-height:1.6}
+  .pn{display:flex;justify-content:space-between;gap:16px;margin-top:52px;flex-wrap:wrap}
+  .pn-prev{padding:12px 18px;background:#fff;color:#000;font-weight:800;font-size:14px}
+  .pn-next{padding:12px 18px;background:var(--y);color:#000;font-weight:800;font-size:14px;margin-left:auto}
+
+  /* ---------- changelog timeline ---------- */
+  .log-wrap{max-width:860px;margin:0 auto;padding:56px 20px 90px}
+  .log-head{margin-bottom:8px}
+  .timeline{position:relative;margin-top:48px;padding-left:46px}
+  .timeline::before{content:"";position:absolute;left:10px;top:8px;bottom:8px;width:2px;background:#000}
+  .entry{position:relative;margin-bottom:48px}
+  .entry:last-child{margin-bottom:0}
+  .node{position:absolute;left:-46px;top:4px;width:22px;height:22px;background:var(--y);border:2px solid #000;transform:rotate(45deg)}
+  .node-wip{background:var(--p);animation:pulse 2.2s ease-in-out infinite}
+  .node-first{background:var(--t)}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,.35)}50%{box-shadow:0 0 0 7px rgba(0,0,0,0)}}
+  .ver-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .ver-tag{border:2px solid #000;background:var(--y);font-weight:800;font-size:14px;padding:5px 11px;box-shadow:3px 3px 0 #000;transform:rotate(-2deg);font-family:var(--mono)}
+  .ver-tag-wip{background:var(--p);transform:rotate(2deg)}
+  .ver-date{font-weight:700;font-size:14px}
+  .stick-latest{border:2px solid #000;background:var(--t);color:#fff;font-weight:800;font-size:12px;padding:4px 9px;transform:rotate(2deg);box-shadow:3px 3px 0 #000}
+  .log-card{border:2px solid #000;background:#fff;box-shadow:5px 5px 0 #000;padding:20px 22px}
+  .log-card .sum{font-size:15.5px;line-height:1.6;font-weight:600}
+  .kind{display:inline-block;border:2px solid #000;font-weight:800;font-size:12px;padding:3px 8px;margin:16px 0 8px}
+  .kind:first-child{margin-top:0}
+  .kind-added{background:var(--y)}
+  .kind-changed{background:var(--p)}
+  .kind-fixed{background:var(--t);color:#fff}
+  .log-list{margin:0;padding-left:20px;font-size:15px;line-height:1.65}
+  .log-list li{margin-bottom:5px}
+  .log-list li:last-child{margin-bottom:0}
+
+  .view{display:none}
+  .view.on{display:block}
+
+  /* ---------- motion + mobile ---------- */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+    .ticker-track{animation:none!important}
+    .tl,.cursor{opacity:1!important}
+    .reveal{opacity:1!important;transform:none!important}
+    .draw{stroke-dashoffset:0!important}
+    .draw-head{opacity:1!important}
+  }
+  @media (max-width:1020px){
+    .hero-grid{grid-template-columns:1fr;gap:44px}
+    .hero-inner h1{font-size:clamp(2.5rem,7vw,3.6rem)}
+  }
+  /* collapse the main nav into a menu once the full row can't fit on one line */
+  @media (max-width:900px){
+    #view-landing .nav-toggle{display:inline-flex;margin-left:auto}
+    .head-menu{display:none}
+    .head-menu[data-open="true"]{display:flex;flex-direction:column;align-items:stretch;order:3;width:100%;gap:0;margin-top:12px;border-top:2px solid #000;padding-top:8px}
+    .head-menu[data-open="true"] .head-nav{flex-direction:column;align-items:stretch;gap:0}
+    .head-menu[data-open="true"] .navlink{font-size:17px;padding:13px 4px;border-bottom:1px solid #000}
+    .head-menu[data-open="true"] .navlink::after{display:none}
+    .head-menu[data-open="true"] .head-cta{flex-direction:column;align-items:stretch;gap:10px;padding:16px 0 6px}
+    .head-menu[data-open="true"] .btn{text-align:center;padding:13px 16px}
+  }
+  @media (max-width:840px){
+    .docs-grid{grid-template-columns:1fr}
+    .sidebar{position:static}
+    .menu-btn{display:flex}
+    .docs-nav[data-open="false"]{display:none}
+    .sticker,.star{display:none}
+  }
+  /* small-screen typography & rhythm */
+  @media (max-width:640px){
+    html{scroll-padding-top:78px}
+    .logo{font-size:19px}
+    .logo svg{width:24px;height:24px}
+    .head-row{gap:10px}
+    .btn{padding:9px 13px;font-size:13px}
+    .head-menu[data-open="true"] .btn{padding:13px 16px;font-size:14px}
+    #view-docs .navlink,#view-log .navlink{font-size:14px;padding:8px 8px}
+    .hero-inner{padding-top:40px;padding-bottom:56px}
+    .hero-grid{gap:36px}
+    .hero-inner h1{font-size:clamp(2.05rem,9vw,2.8rem);line-height:1.07;margin-bottom:18px}
+    .hero-inner .lede{font-size:1.02rem;line-height:1.6;margin-bottom:24px}
+    .display{font-size:clamp(1.65rem,7.2vw,2.3rem);line-height:1.1}
+    .sec-pad{padding-top:52px;padding-bottom:52px}
+    .sec-head{margin-bottom:28px}
+    .privacy-grid{padding-top:52px;padding-bottom:52px;gap:30px}
+    .faq-wrap{padding-top:52px;padding-bottom:52px}
+    .cta-inner{padding-top:56px;padding-bottom:56px}
+    .ticker-track span{font-size:14px}
+    .term pre{font-size:12.5px;padding:15px 16px}
+    .card{padding:18px}
+    .card p{font-size:14.5px}
+    details.faq summary{font-size:15.5px;padding:14px 15px}
+    details.faq p{font-size:14.5px;padding:0 15px 14px}
+    .providers-row{padding-top:32px;padding-bottom:32px}
+    .foot-row{font-size:13px;gap:14px}
+    .log-wrap{padding-top:36px}
+    .timeline{padding-left:38px}
+    .node{left:-38px;width:18px;height:18px}
+    .doc-lede{font-size:15.5px}
+    .doc-p,.doc-ul{font-size:15px}
+  }
+</style>
+
+<!-- ============================================================ LANDING -->
+<div id="view-landing" class="view on">
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-head">
+    <div class="wrap head-row">
+      <a href="#/" class="logo" aria-label="Beacon home">
+        <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+          <path class="beam" d="M10 9 L3 5" stroke="#000" stroke-width="2" stroke-linecap="round"></path>
+          <path class="beam beam-r" d="M22 9 L29 5" stroke="#000" stroke-width="2" stroke-linecap="round"></path>
+          <rect x="12" y="6" width="8" height="6" fill="#FF90E8" stroke="#000" stroke-width="2"></rect>
+          <path d="M13 12 L19 12 L21.5 29 L10.5 29 Z" fill="#FFC900" stroke="#000" stroke-width="2"></path>
+          <path d="M12 18 L20 18" stroke="#000" stroke-width="2"></path>
+          <path d="M11.2 23.5 L20.8 23.5" stroke="#000" stroke-width="2"></path>
+        </svg>
+        Beacon
+      </a>
+      <button class="nav-toggle" id="nav-btn" aria-expanded="false" aria-controls="head-menu" aria-label="Menu">☰</button>
+      <div class="head-menu" id="head-menu" data-open="false">
+        <nav aria-label="Main" class="head-nav">
+          <a class="navlink" href="#how-it-works">How it works</a>
+          <a class="navlink" href="#privacy">Privacy</a>
+          <a class="navlink" href="#/docs/getting-started">Docs</a>
+          <a class="navlink" href="#faq">FAQ</a>
+          <a class="navlink" href="#/changelog">Changelog</a>
+        </nav>
+        <div class="head-cta">
+          <a class="press btn btn-dark" href="https://github.com/O-Midey/beacon">★ Star on GitHub</a>
+          <a class="press btn btn-y" href="#/docs/getting-started">Get started →</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="sec">
+      <div class="wrap hero-inner">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 class="rise">You ship. Beacon drafts the <span class="flip"><span class="fw" id="flip-word">tweet</span></span>.</h1>
+            <p class="lede rise" style="--d:.12s">Beacon watches your commits — scans them for secrets, scores what's worth telling, and drafts build-in-public posts for every platform you're on. Local, private, and never posted without you.</p>
+
+            <div class="install-row rise" style="--d:.24s">
+              <code class="cmd">npm install -g beacon-bip</code>
+              <button class="cmd-copy" data-copy="npm install -g beacon-bip">copy</button>
+            </div>
+
+            <div class="plat-row rise" style="--d:.32s" aria-label="Supported platforms">
+              <span class="plat-label">drafts for</span>
+              <span class="chip">𝕏 / Twitter</span>
+              <span class="chip">LinkedIn</span>
+              <span class="chip">dev.to</span>
+              <span class="chip">Bluesky</span>
+              <span class="chip">Mastodon</span>
+            </div>
+          </div>
+
+          <div class="hero-side rise" style="--d:.38s">
+            <div class="sticker bob" style="top:-16px;left:-14px;rotate:-6deg;background:var(--p);z-index:2">MIT licensed</div>
+            <div class="sticker bob-2" style="bottom:-16px;right:-10px;rotate:4deg;background:var(--t);color:#fff;z-index:2">works offline</div>
+            <svg class="star" width="70" height="70" viewBox="0 0 32 32" aria-hidden="true" style="top:-40px;right:-16px">
+              <path d="M16 2 L19 12 L30 12 L21 18 L24 29 L16 22 L8 29 L11 18 L2 12 L13 12 Z" fill="#FFC900" stroke="#000" stroke-width="1.6"></path>
+            </svg>
+
+            <div class="term">
+              <div class="termbar">
+                <span class="dot" style="background:var(--p)"></span>
+                <span class="dot" style="background:var(--y)"></span>
+                <span class="dot" style="background:var(--t)"></span>
+                <span class="label">~/projects/rocket-editor</span>
+              </div>
+              <pre><span class="tl" style="--i:.7s"><span class="c-y">$</span> git commit -m "feat: add offline sync for drafts"</span>
+<span class="tl" style="--i:1.2s">[main 4f2c9a1] feat: add offline sync for drafts</span>
+<span class="tl" style="--i:1.35s"> 3 files changed, 87 insertions(+), 12 deletions(-)</span>
+
+<span class="tl" style="--i:2s"><span class="c-p">✦ beacon</span> · post-commit</span>
+<span class="tl" style="--i:2.6s">  <span class="c-g">✓</span> safety scan passed — no secrets found</span>
+<span class="tl" style="--i:3.2s">  <span class="c-g">✓</span> significance: 8/10 (threshold 6)</span>
+<span class="tl" style="--i:3.8s">  <span class="c-g">✓</span> drafting for twitter, linkedin, dev.to…</span>
+
+<span class="tl" style="--i:4.4s">  <span class="c-y">3 drafts queued</span> → run <span class="c-p">beacon review</span> </span><span class="cursor"></span></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TICKER -->
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+        <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+      </div>
+    </div>
+
+    <!-- HOW IT WORKS -->
+    <section id="how-it-works" class="sec">
+      <div class="wrap sec-pad">
+        <div class="sec-head reveal">
+          <h2 class="display">Every commit, five stages.</h2>
+          <svg width="120" height="34" viewBox="0 0 120 34" aria-hidden="true" style="margin-bottom:6px">
+            <path class="draw" pathLength="1" d="M4 22 Q 40 6, 100 16" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"></path>
+            <path class="draw-head" d="M100 16 L88 10 M100 16 L90 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"></path>
+          </svg>
+        </div>
+        <div class="grid-auto">
+          <div class="card lift reveal">
+            <span class="badge" style="background:var(--y);rotate:-2deg">01 · capture</span>
+            <p>The post-commit hook reads your diff, message, and file stats into a typed snapshot. Diffs are truncated at ~8k chars to keep costs down.</p>
+          </div>
+          <div class="card lift reveal" style="--d:.08s">
+            <span class="badge" style="background:var(--p);rotate:1.5deg">02 · safety</span>
+            <p>A regex-only secret scanner runs <strong>before</strong> any LLM call. Critical findings block drafting entirely; warnings are redacted from what the model sees.</p>
+          </div>
+          <div class="card lift reveal" style="--d:.16s">
+            <span class="badge" style="background:var(--t);color:#fff;rotate:-1.5deg">03 · significance</span>
+            <p>An LLM scores the commit 0–10 on the redacted diff. Typo fixes and dep bumps below your threshold (default 6) are skipped. No noise.</p>
+          </div>
+          <div class="card lift reveal" style="--d:.24s">
+            <span class="badge" style="background:var(--y);rotate:2deg">04 · draft</span>
+            <p>One LLM call writes a draft for every enabled platform — in your voice, your language, adapted to each platform's shape.</p>
+          </div>
+          <div class="card lift reveal" style="--d:.32s">
+            <span class="badge" style="background:var(--p);rotate:-2deg">05 · queue</span>
+            <p>Drafts land atomically in <code class="inline">~/.beacon/queue.json</code>, capped at 50. Nothing goes anywhere until you review.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEW / PRIVACY -->
+    <section id="privacy" class="sec privacy">
+      <div class="wrap privacy-grid">
+        <div class="reveal">
+          <h2 class="display" style="margin-bottom:18px">Nothing leaves your machine without you.</h2>
+          <p class="lede-p">Beacon never posts. It can't — it has no credentials for your social accounts. <strong>Approving a draft copies it to your clipboard</strong>, and that's the whole exit path.</p>
+          <ul class="rules">
+            <li>approve → clipboard, never an API call</li>
+            <li>edit → opens your $EDITOR, validated on save</li>
+            <li>discard or skip → the queue is yours</li>
+          </ul>
+        </div>
+        <div class="term reveal" style="--d:.15s;max-width:none">
+          <div class="termbar">
+            <span class="dot" style="background:var(--p)"></span>
+            <span class="dot" style="background:var(--y)"></span>
+            <span class="dot" style="background:var(--t)"></span>
+            <span class="label">beacon review</span>
+          </div>
+          <pre style="font-size:13px"><span class="c-p">✦ beacon review</span> — 3 drafts in queue
+
+<span class="c-y">draft 1/3 · significance 8/10</span>
+────────────────────────────────────
+<span class="c-g">▸ twitter/x</span>   linkedin   dev.to
+
+  Shipped offline sync for Rocket Editor.
+  Your drafts now survive a dead wifi
+  connection — and so does your flow.
+  87 lines, mostly worth it.
+
+<span class="c-y">[a]</span> approve → clipboard  <span class="c-y">[e]</span> edit in $EDITOR
+<span class="c-y">[d]</span> discard             <span class="c-y">[s]</span> skip</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section class="sec">
+      <div class="wrap sec-pad">
+        <h2 class="display reveal" style="margin-bottom:36px">Built for people who'd rather be coding.</h2>
+        <div class="grid-feat">
+          <div class="card lift reveal" style="padding:22px">
+            <svg class="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 L28 8 L28 16 C28 24 22 28 16 30 C10 28 4 24 4 16 L4 8 Z" fill="#FF90E8" stroke="#000" stroke-width="2"></path><path d="M10 16 L14 20 L22 11" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"></path></svg>
+            <h3>Secret scanner</h3>
+            <p>API keys, JWTs, DB strings, .env assignments, private IPs — caught by regex before any model call. A leaked key blocks drafting for that commit, full stop.</p>
+          </div>
+          <div class="card lift reveal" style="padding:22px;--d:.08s">
+            <svg class="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 5 L28 5 L19 16 L19 26 L13 29 L13 16 Z" fill="#FFC900" stroke="#000" stroke-width="2"></path></svg>
+            <h3>Significance filter</h3>
+            <p>Not every commit is a post. Each one is scored 0–10; anything under your threshold is quietly skipped. Your followers never see "fix typo".</p>
+          </div>
+          <div class="card lift reveal" style="padding:22px;--d:.16s">
+            <svg class="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><circle cx="13" cy="16" r="10" fill="#23A094" stroke="#000" stroke-width="2"></circle><path d="M26 10 Q 30 16, 26 22" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"></path></svg>
+            <h3>Your voice &amp; language</h3>
+            <p>Your name, bio, and voice notes shape every draft — in any language you configure. It reads like you wrote it, because you told it how you write.</p>
+          </div>
+          <div class="card lift reveal" style="padding:22px">
+            <svg class="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="18" width="24" height="8" fill="#FFC900" stroke="#000" stroke-width="2"></rect><rect x="7" y="11" width="18" height="7" fill="#FF90E8" stroke="#000" stroke-width="2"></rect><rect x="10" y="5" width="12" height="6" fill="#23A094" stroke="#000" stroke-width="2"></rect></svg>
+            <h3>Digest mode</h3>
+            <p><code class="inline">beacon draft --week</code> turns a week of commits into one "here's what I shipped" post. Also <code class="inline">--today</code> and <code class="inline">--since "3 days ago"</code>.</p>
+          </div>
+          <div class="card lift reveal" style="padding:22px;--d:.08s">
+            <svg class="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="8" r="4" fill="#FF90E8" stroke="#000" stroke-width="2"></circle><circle cx="24" cy="8" r="4" fill="#FFC900" stroke="#000" stroke-width="2"></circle><circle cx="16" cy="16" r="4" fill="#23A094" stroke="#000" stroke-width="2"></circle><circle cx="8" cy="24" r="4" fill="#FFC900" stroke="#000" stroke-width="2"></circle><circle cx="24" cy="24" r="4" fill="#FF90E8" stroke="#000" stroke-width="2"></circle></svg>
+            <h3>Five platforms, one prompt</h3>
+            <p>Twitter/X, LinkedIn, and dev.to on by default; Bluesky and Mastodon a toggle away. Each gets its own draft, adapted from a single pass.</p>
+          </div>
+          <div class="card lift reveal" style="padding:22px;--d:.16s">
+            <svg class="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="5" width="22" height="22" fill="#171714" stroke="#000" stroke-width="2"></rect><circle cx="16" cy="16" r="6" fill="#FFC900" stroke="#000" stroke-width="2"></circle></svg>
+            <h3>Fully offline with Ollama</h3>
+            <p>Point Beacon at a local model and your diff never leaves your machine at all. No key, no cost, no network. Anthropic and OpenAI-compatible APIs also supported.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROVIDERS -->
+    <section class="sec providers">
+      <div class="wrap providers-row reveal">
+        <span style="font-weight:800;font-size:15px;margin-right:6px">Bring your own model:</span>
+        <span class="chip">Anthropic</span>
+        <span class="chip">OpenAI</span>
+        <span class="chip">OpenRouter</span>
+        <span class="chip">Groq</span>
+        <span class="chip">Together</span>
+        <span class="chip chip-t">Ollama — local, no key</span>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="sec">
+      <div class="faq-wrap">
+        <h2 class="display reveal" style="margin-bottom:32px">Fair questions.</h2>
+        <div class="faq-list">
+          <details class="faq reveal">
+            <summary>Does it post automatically?</summary>
+            <p>Never. Approving a draft copies it to your clipboard. Beacon has no access to your social accounts — there are no posting credentials anywhere in the tool.</p>
+          </details>
+          <details class="faq reveal" style="--d:.06s">
+            <summary>Is my code sent anywhere?</summary>
+            <p>Only a secret-redacted, truncated diff goes to your chosen LLM provider — or nowhere at all if you use Ollama. No server, no database, no cloud sync: just two JSON files under ~/.beacon/.</p>
+          </details>
+          <details class="faq reveal" style="--d:.12s">
+            <summary>What if I commit a secret?</summary>
+            <p>The scanner catches it before any LLM call and blocks drafting for that commit entirely. The model never sees your raw diff — critical findings never reach it in any form.</p>
+          </details>
+          <details class="faq reveal" style="--d:.18s">
+            <summary>Does it spam a draft for every commit?</summary>
+            <p>No — commits scoring below the significance threshold (default 6/10) are skipped. Typo fixes, dep bumps, and routine refactors never make it to the queue.</p>
+          </details>
+          <details class="faq reveal" style="--d:.24s">
+            <summary>What does it cost?</summary>
+            <p>Beacon is free and MIT-licensed. You pay only your own LLM usage — or nothing at all with Ollama.</p>
+          </details>
+          <details class="faq reveal" style="--d:.3s">
+            <summary>What do I need to run it?</summary>
+            <p>Node ≥ 20 and git. That's it. Install globally with npm, run beacon init, and your next commit gets drafted.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="sec cta">
+      <div class="wrap cta-inner">
+        <h2 class="reveal">Your next commit could be your next post.</h2>
+        <div class="cta-btns reveal" style="--d:.1s">
+          <button class="press cta-cmd" data-copy="npm install -g beacon-bip">npm install -g beacon-bip</button>
+          <a class="press cta-docs" href="#/docs/getting-started">Read the docs →</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-row">
+      <span style="font-weight:800">Beacon</span>
+      <span>MIT © 2026 Mide</span>
+      <span class="foot-right">
+        <a href="https://github.com/O-Midey/beacon">GitHub</a>
+        <a href="https://omotosho.xyz">omotosho.xyz</a>
+        <a class="ver" href="#/changelog" aria-label="Version 0.2.1 — view changelog">v0.2.1</a>
+      </span>
+    </div>
+  </footer>
+</div>
+
+<!-- ============================================================ DOCS -->
+<div id="view-docs" class="view">
+  <header class="site-head">
+    <div class="wrap head-row">
+      <a href="#/" class="logo" aria-label="Beacon home">
+        <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+          <path class="beam" d="M10 9 L3 5" stroke="#000" stroke-width="2" stroke-linecap="round"></path>
+          <path class="beam beam-r" d="M22 9 L29 5" stroke="#000" stroke-width="2" stroke-linecap="round"></path>
+          <rect x="12" y="6" width="8" height="6" fill="#FF90E8" stroke="#000" stroke-width="2"></rect>
+          <path d="M13 12 L19 12 L21.5 29 L10.5 29 Z" fill="#FFC900" stroke="#000" stroke-width="2"></path>
+          <path d="M12 18 L20 18" stroke="#000" stroke-width="2"></path>
+          <path d="M11.2 23.5 L20.8 23.5" stroke="#000" stroke-width="2"></path>
+        </svg>
+        Beacon
+        <span class="mini-badge" style="background:var(--p)">docs</span>
+      </a>
+      <div class="head-cta" style="margin-left:auto">
+        <a class="navlink" href="#/">← Home</a>
+        <a class="press btn btn-dark" href="https://github.com/O-Midey/beacon">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="docs-grid">
+    <aside class="sidebar">
+      <button class="menu-btn" id="menu-btn" aria-expanded="false">Menu <span id="menu-chev">▼</span></button>
+      <nav class="docs-nav" id="docs-nav" data-open="false" aria-label="Documentation">
+        <a href="#/docs/getting-started">Getting started</a>
+        <a href="#/docs/how-it-works">How it works</a>
+        <a href="#/docs/commands">Commands</a>
+        <a href="#/docs/configuration">Configuration</a>
+        <a href="#/docs/providers">Providers</a>
+        <a href="#/docs/privacy">Privacy &amp; security</a>
+        <a href="#/docs/troubleshooting">Troubleshooting</a>
+        <div class="nav-extra"><a href="#/changelog" style="font-family:var(--mono)">Changelog · v0.2.1</a></div>
+      </nav>
+    </aside>
+
+    <main id="docs-main" class="docs-main">
+
+      <article class="doc-page" id="doc-getting-started">
+        <h1 class="doc-title">Getting started</h1>
+        <p class="doc-lede">From zero to your first draft in about two minutes.</p>
+
+        <h2 class="doc-h2">Requirements</h2>
+        <ul class="doc-ul"><li>Node ≥ 20</li><li>git</li></ul>
+
+        <h2 class="doc-h2">Install</h2>
+        <div class="codeblock">
+          <button class="copybtn" data-copy="npm install -g beacon-bip">copy</button>
+          <pre>npm install -g beacon-bip</pre>
+        </div>
+
+        <h2 class="doc-h2">Set up</h2>
+        <div class="codeblock">
+          <button class="copybtn" data-copy="beacon init">copy</button>
+          <pre>beacon init</pre>
+        </div>
+        <p class="doc-p">The guided setup walks you through your provider, API key, voice, and language, then installs the post-commit hook in your repo. It even drafts from your latest commit before setup finishes — so you see the result immediately.</p>
+
+        <h2 class="doc-h2">Then just work</h2>
+        <p class="doc-p">Commit as usual. When there's something worth posting, Beacon queues drafts in the background. Review them whenever you like:</p>
+        <div class="codeblock">
+          <button class="copybtn" data-copy="beacon review">copy</button>
+          <pre>git commit -m "feat: the thing you built"
+beacon review</pre>
+        </div>
+        <div class="callout callout-y"><strong>Nothing posts automatically.</strong> Approving a draft copies it to your clipboard — Beacon has no credentials for your social accounts.</div>
+      </article>
+
+      <article class="doc-page" id="doc-how-it-works">
+        <h1 class="doc-title">How it works</h1>
+        <p class="doc-lede">Beacon runs as a git post-commit hook. Every commit flows through five strictly separated stages — each one exists so the next can be trusted.</p>
+
+        <h2 class="doc-h2">1 · Capture</h2>
+        <p class="doc-p">The commit's diff, message, and changed-file stats are read into a typed snapshot. The diff is truncated at ~8k characters (configurable via <code class="inline">maxDiffChars</code>) to keep LLM costs predictable.</p>
+
+        <h2 class="doc-h2">2 · Safety</h2>
+        <p class="doc-p">A regex-only secret scanner runs <strong>before any LLM call</strong>. It detects API keys, private-key headers, JWTs, DB connection strings, .env assignments, private IPs, and internal hostnames. Critical findings block drafting entirely; warnings are redacted from everything the model sees. The model never sees the raw diff.</p>
+
+        <h2 class="doc-h2">3 · Significance</h2>
+        <p class="doc-p">An LLM scores the commit 0–10 on the redacted diff. Routine changes — typo fixes, dep bumps, refactors — below your threshold (default 6) are skipped. No noise in your queue.</p>
+
+        <h2 class="doc-h2">4 · Draft</h2>
+        <p class="doc-p">One LLM call produces drafts for every enabled platform, shaped by your name, bio, voice notes, and language from config.</p>
+
+        <h2 class="doc-h2">5 · Queue</h2>
+        <p class="doc-p">Drafts persist atomically to <code class="inline">~/.beacon/queue.json</code>, capped at 50 entries. They wait there until you run <code class="inline">beacon review</code>.</p>
+      </article>
+
+      <article class="doc-page" id="doc-commands">
+        <h1 class="doc-title">Commands</h1>
+        <p class="doc-lede">Six commands. You'll mostly use two.</p>
+
+        <h2 class="doc-h2">beacon init</h2>
+        <p class="doc-p">Guided setup: provider, API key, voice, and language. Installs the post-commit hook, and drafts from your latest commit before setup even finishes.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon init">copy</button><pre>beacon init</pre></div>
+
+        <h2 class="doc-h2">beacon install</h2>
+        <p class="doc-p">Installs the post-commit hook in the current repo — for repos you add after init.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon install">copy</button><pre>cd your-repo
+beacon install</pre></div>
+
+        <h2 class="doc-h2">beacon draft</h2>
+        <p class="doc-p">Manual draft from the latest commit — or a digest across many.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon draft --week">copy</button><pre>beacon draft                        <span class="c-dim"># latest commit</span>
+beacon draft --message "shipped v2" <span class="c-dim"># from freeform text</span>
+beacon draft --file notes.md        <span class="c-dim"># from a file</span>
+beacon draft --today                <span class="c-dim"># digest of today</span>
+beacon draft --week                 <span class="c-dim"># "here's what I shipped"</span>
+beacon draft --since "3 days ago"   <span class="c-dim"># anything git log --since accepts</span></pre></div>
+
+        <h2 class="doc-h2">beacon review</h2>
+        <p class="doc-p">Interactive queue. Shows the significance score and every drafted platform for each entry.</p>
+        <ul class="doc-ul">
+          <li><strong>approve</strong> — copies the draft to your clipboard</li>
+          <li><strong>edit</strong> — opens $EDITOR on plain text, validated on save</li>
+          <li><strong>discard</strong> — removes it from the queue</li>
+          <li><strong>skip</strong> — leaves it for later</li>
+        </ul>
+
+        <h2 class="doc-h2">beacon config set</h2>
+        <p class="doc-p">Set any config key. See <a href="#/docs/configuration" style="color:#000;font-weight:700">Configuration</a> for the full list.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon config set significance-threshold 5">copy</button><pre>beacon config set significance-threshold 5
+beacon config set platform bluesky on</pre></div>
+
+        <h2 class="doc-h2">beacon doctor</h2>
+        <p class="doc-p">Health check: node, git, config, hook, PATH, and a live provider ping. Run this first when anything misbehaves.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon doctor">copy</button><pre>beacon doctor</pre></div>
+      </article>
+
+      <article class="doc-page" id="doc-configuration">
+        <h1 class="doc-title">Configuration</h1>
+        <p class="doc-lede">Everything lives in <code class="inline">~/.beacon/config.json</code> (file mode 0600). Set values with <code class="inline">beacon config set &lt;key&gt; &lt;value&gt;</code>.</p>
+
+        <div class="tablebox">
+          <table class="cfg">
+            <thead><tr><th>Key</th><th>Default</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td><code class="k">provider</code></td><td><code>anthropic</code></td><td>anthropic or openai (any OpenAI-compatible endpoint, incl. Ollama)</td></tr>
+              <tr><td><code class="k">apiKey</code></td><td><code>""</code></td><td>Env vars ANTHROPIC_API_KEY / OPENAI_API_KEY override it</td></tr>
+              <tr><td><code class="k">baseUrl</code></td><td>—</td><td>For the openai provider (e.g. https://openrouter.ai/api/v1)</td></tr>
+              <tr><td><code class="k">significanceThreshold</code></td><td><code>6</code></td><td>0–10; lower = more drafts</td></tr>
+              <tr><td><code class="k">authorName</code></td><td>—</td><td>Identity for the drafter prompt</td></tr>
+              <tr><td><code class="k">authorBio</code></td><td>—</td><td>Short bio that shapes every draft</td></tr>
+              <tr><td><code class="k">authorNotes</code></td><td>—</td><td>Voice notes: tone, phrases, things to avoid</td></tr>
+              <tr><td><code class="k">language</code></td><td><code>English</code></td><td>Any language name works</td></tr>
+              <tr><td><code class="k">platforms</code></td><td>twitter, linkedin, devto on</td><td>bluesky, mastodon off by default. Toggle: <code>beacon config set platform &lt;name&gt; &lt;on|off&gt;</code></td></tr>
+              <tr><td><code class="k">model</code></td><td><code>claude-sonnet-4-6</code></td><td>Model ID for the active provider</td></tr>
+              <tr><td><code class="k">maxDiffChars</code></td><td><code>8000</code></td><td>Diff truncation before LLM calls</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="doc-page" id="doc-providers">
+        <h1 class="doc-title">Providers</h1>
+        <p class="doc-lede">Anthropic by default, any OpenAI-compatible endpoint, or fully local with Ollama.</p>
+
+        <h2 class="doc-h2">Anthropic (default)</h2>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon config set api-key sk-ant-...">copy</button><pre>beacon config set api-key sk-ant-...
+<span class="c-dim"># or: export ANTHROPIC_API_KEY=sk-ant-...</span></pre></div>
+
+        <h2 class="doc-h2">OpenAI-compatible</h2>
+        <p class="doc-p">Works with OpenAI, OpenRouter, Groq, Together, or any local server speaking the OpenAI API.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon config set provider openai
+beacon config set model gpt-4o
+beacon config set base-url https://openrouter.ai/api/v1
+beacon config set api-key sk-or-...">copy</button><pre>beacon config set provider openai
+beacon config set model gpt-4o
+beacon config set base-url https://openrouter.ai/api/v1
+beacon config set api-key sk-or-...</pre></div>
+
+        <h2 class="doc-h2">Ollama (fully local, zero cost)</h2>
+        <p class="doc-p">With a local model, your diff never leaves your machine at all. No key needed.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="ollama pull llama3.1
+beacon config set provider openai
+beacon config set base-url http://localhost:11434/v1
+beacon config set model llama3.1
+beacon config set api-key ollama">copy</button><pre>ollama pull llama3.1
+beacon config set provider openai
+beacon config set base-url http://localhost:11434/v1
+beacon config set model llama3.1
+beacon config set api-key ollama</pre></div>
+        <div class="callout callout-t">Fully offline. Zero cost. Your code never touches a network.</div>
+      </article>
+
+      <article class="doc-page" id="doc-privacy">
+        <h1 class="doc-title">Privacy &amp; security</h1>
+        <p class="doc-lede">The security model is architectural, not a promise.</p>
+        <ul class="sec-cards">
+          <li><strong>Scanner first, always.</strong> The regex secret scanner runs before any LLM call. The model never sees the raw diff — only a redacted, truncated version.</li>
+          <li><strong>Critical findings abort drafting.</strong> A leaked key (e.g. sk-ant-…) stops the pipeline for that commit and logs which lines triggered it.</li>
+          <li><strong>Keys stay on your machine.</strong> Env var or the 0600 config file — nowhere else.</li>
+          <li><strong>No server, no database, no cloud sync.</strong> Beacon's entire footprint is two JSON files under ~/.beacon/ plus a log at ~/.beacon/beacon.log. No telemetry, no accounts.</li>
+          <li><strong>No posting credentials.</strong> Beacon cannot publish anything. Approving a draft copies it to your clipboard — that's the only way content leaves the tool.</li>
+        </ul>
+      </article>
+
+      <article class="doc-page" id="doc-troubleshooting">
+        <h1 class="doc-title">Troubleshooting</h1>
+        <p class="doc-lede">Start with the doctor — it checks node, git, config, hook, PATH, and pings your provider live.</p>
+        <div class="codeblock"><button class="copybtn" data-copy="beacon doctor">copy</button><pre>beacon doctor</pre></div>
+        <p class="doc-p">Logs live at <code class="inline">~/.beacon/beacon.log</code>.</p>
+
+        <h2 class="doc-h2">Common fixes</h2>
+        <div class="sec-cards">
+          <div>
+            <p class="fix-t">The hook isn't firing after commits</p>
+            <p class="fix-p">Run <code class="inline">beacon install</code> again in the repo — another tool may have overwritten the post-commit hook.</p>
+          </div>
+          <div>
+            <p class="fix-t">No drafts are showing up</p>
+            <p class="fix-p">Your commits may be scoring below the threshold. Lower it: <code class="inline">beacon config set significance-threshold 4</code>.</p>
+          </div>
+          <div>
+            <p class="fix-t">Provider errors</p>
+            <p class="fix-p"><code class="inline">beacon doctor</code> does a live provider ping. Check your API key (env vars override config) and, for openai providers, the base-url.</p>
+          </div>
+          <div>
+            <p class="fix-t">beacon: command not found</p>
+            <p class="fix-p">Your npm global bin isn't on PATH. <code class="inline">npm bin -g</code> shows where it is; add that to your shell profile. <code class="inline">beacon doctor</code> checks this too.</p>
+          </div>
+          <div>
+            <p class="fix-t">A commit with a secret was blocked — now what?</p>
+            <p class="fix-p">That's by design. Rotate the secret, clean up the commit, and draft manually afterwards with <code class="inline">beacon draft</code>. The log shows which lines triggered the block.</p>
+          </div>
+        </div>
+      </article>
+
+      <div class="pn">
+        <a class="press pn-prev" id="pn-prev" href="#">←</a>
+        <a class="press pn-next" id="pn-next" href="#">→</a>
+      </div>
+    </main>
+  </div>
+
+  <footer class="foot" style="border-top:2px solid #000">
+    <div class="wrap foot-row">
+      <span style="font-weight:800">Beacon</span>
+      <span>MIT © 2026 Mide</span>
+      <span class="foot-right">
+        <a href="https://github.com/O-Midey/beacon">GitHub</a>
+        <a href="https://omotosho.xyz">omotosho.xyz</a>
+        <a class="ver" href="#/changelog" aria-label="Version 0.2.1 — view changelog">v0.2.1</a>
+      </span>
+    </div>
+  </footer>
+</div>
+
+<!-- ============================================================ CHANGELOG -->
+<div id="view-log" class="view">
+  <header class="site-head">
+    <div class="wrap head-row">
+      <a href="#/" class="logo" aria-label="Beacon home">
+        <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+          <path class="beam" d="M10 9 L3 5" stroke="#000" stroke-width="2" stroke-linecap="round"></path>
+          <path class="beam beam-r" d="M22 9 L29 5" stroke="#000" stroke-width="2" stroke-linecap="round"></path>
+          <rect x="12" y="6" width="8" height="6" fill="#FF90E8" stroke="#000" stroke-width="2"></rect>
+          <path d="M13 12 L19 12 L21.5 29 L10.5 29 Z" fill="#FFC900" stroke="#000" stroke-width="2"></path>
+          <path d="M12 18 L20 18" stroke="#000" stroke-width="2"></path>
+          <path d="M11.2 23.5 L20.8 23.5" stroke="#000" stroke-width="2"></path>
+        </svg>
+        Beacon
+        <span class="mini-badge" style="background:var(--y)">changelog</span>
+      </a>
+      <div class="head-cta" style="margin-left:auto">
+        <a class="navlink" href="#/">← Home</a>
+        <a class="navlink" href="#/docs/getting-started">Docs</a>
+        <a class="press btn btn-dark" href="https://github.com/O-Midey/beacon">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="log-wrap">
+    <h1 class="doc-title log-head rise">What's shipped.</h1>
+    <p class="doc-lede rise" style="--d:.1s">Every release, straight from the changelog. Beacon follows <a href="https://semver.org" style="color:#000;font-weight:700">semantic versioning</a> and the Keep a Changelog format.</p>
+
+    <div class="timeline">
+      <div class="entry reveal">
+        <span class="node node-wip" aria-hidden="true"></span>
+        <div class="ver-row">
+          <span class="ver-tag ver-tag-wip">unreleased</span>
+          <span class="ver-date">in progress</span>
+        </div>
+        <div class="log-card">
+          <p class="sum">The onboarding release: guided setup, self-diagnosis, two new platforms, and drafting in any language.</p>
+          <span class="kind kind-added">Added</span>
+          <ul class="log-list">
+            <li><strong>beacon init</strong> — guided first-run setup: provider, key, model, voice, language, hook install, connection test — ending with a draft from your latest commit.</li>
+            <li><strong>beacon doctor</strong> — setup diagnostics: node/git versions, config, API key, hook presence and executability, PATH, and a live provider ping.</li>
+            <li><strong>Ollama preset</strong> in init — fully local, free drafting with no API key.</li>
+            <li><strong>Digest drafting</strong> — <code class="inline">--since</code>, <code class="inline">--week</code>, and <code class="inline">--today</code> combine a range of commits into one draft.</li>
+            <li><strong>Bluesky and Mastodon</strong> platforms (opt-in via <code class="inline">beacon config set platform bluesky on</code>).</li>
+            <li><strong>Configurable author identity and language</strong> — <code class="inline">authorName</code>, <code class="inline">authorBio</code>, and <code class="inline">language</code> drive the drafter's voice prompt.</li>
+          </ul>
+          <span class="kind kind-changed">Changed</span>
+          <ul class="log-list">
+            <li><strong>Review edit flow</strong> — editing opens a single platform's draft as plain text instead of raw JSON, still schema-validated on save.</li>
+            <li>The drafter prompt is composed from enabled platforms only, reducing token cost.</li>
+          </ul>
+          <span class="kind kind-fixed">Fixed</span>
+          <ul class="log-list">
+            <li>QuietSpinner constructor call passed an argument it did not accept.</li>
+            <li>OpenAI-compatible 401/403 responses now normalize to AUTH_ERROR.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="entry reveal">
+        <span class="node" aria-hidden="true"></span>
+        <div class="ver-row">
+          <span class="ver-tag">v0.2.1</span>
+          <span class="ver-date">June 25, 2026</span>
+          <span class="stick-latest">latest</span>
+        </div>
+        <div class="log-card">
+          <span class="kind kind-fixed">Fixed</span>
+          <ul class="log-list">
+            <li>Robust JSON parsing for LLM responses — malformed model output no longer breaks drafting.</li>
+          </ul>
+          <span class="kind kind-changed">Changed</span>
+          <ul class="log-list">
+            <li>Extended the platform prompt schemas.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="entry reveal">
+        <span class="node" aria-hidden="true"></span>
+        <div class="ver-row">
+          <span class="ver-tag">v0.2.0</span>
+          <span class="ver-date">June 25, 2026</span>
+        </div>
+        <div class="log-card">
+          <p class="sum">The multi-provider release — Beacon stops being Anthropic-only, and the safety scanner moves in front of every LLM call.</p>
+          <span class="kind kind-added">Added</span>
+          <ul class="log-list">
+            <li><strong>Multi-provider LLM support</strong> — a provider abstraction with <code class="inline">anthropic</code> (default) and <code class="inline">openai</code> (any OpenAI-compatible Chat Completions endpoint: OpenAI, OpenRouter, Groq, Together, a local server) over fetch, with no new dependency.</li>
+            <li>New config keys <code class="inline">provider</code> and <code class="inline">baseUrl</code>, plus provider-aware API-key resolution (env vars take precedence).</li>
+          </ul>
+          <span class="kind kind-changed">Changed</span>
+          <ul class="log-list">
+            <li><strong>Pipeline reordered</strong> to capture → safety → significance → draft → queue. Both LLM calls now only ever see the redacted diff; a critical finding blocks the pipeline before any network call.</li>
+          </ul>
+          <span class="kind kind-fixed">Fixed</span>
+          <ul class="log-list">
+            <li>LLM JSON parsing — prompt templates no longer embed comments that models echoed back as invalid JSON; parsing also retries once after stripping trailing commas.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="entry reveal">
+        <span class="node" aria-hidden="true"></span>
+        <div class="ver-row">
+          <span class="ver-tag">v0.1.1</span>
+          <span class="ver-date">June 25, 2026</span>
+        </div>
+        <div class="log-card">
+          <span class="kind kind-fixed">Fixed</span>
+          <ul class="log-list">
+            <li><strong>bin path</strong> — the global <code class="inline">beacon</code> command failed to resolve because <code class="inline">bin</code> pointed at a path the build doesn't emit.</li>
+            <li>Git stderr no longer leaks into commit/hook output; it is captured instead of inherited.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="entry reveal">
+        <span class="node node-first" aria-hidden="true"></span>
+        <div class="ver-row">
+          <span class="ver-tag" style="background:var(--t);color:#fff">v0.1.0</span>
+          <span class="ver-date">June 25, 2026</span>
+        </div>
+        <div class="log-card">
+          <p class="sum">First light. 🎉</p>
+          <span class="kind kind-added">Added</span>
+          <ul class="log-list">
+            <li>Initial release: <code class="inline">run</code>, <code class="inline">install</code>, <code class="inline">review</code>, <code class="inline">draft</code>, and <code class="inline">config</code> commands.</li>
+            <li>Five-stage local pipeline drafting build-in-public content for Twitter/X, LinkedIn, and dev.to from git commits.</li>
+            <li>Regex-based safety scanner, significance filter, voice drafter, atomic JSON review queue, and a post-commit git hook.</li>
+            <li>Daily log rotation with a 7-day retention window.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot" style="border-top:2px solid #000">
+    <div class="wrap foot-row">
+      <span style="font-weight:800">Beacon</span>
+      <span>MIT © 2026 Mide</span>
+      <span class="foot-right">
+        <a href="https://github.com/O-Midey/beacon">GitHub</a>
+        <a href="https://omotosho.xyz">omotosho.xyz</a>
+        <span class="ver" style="background:var(--y);color:#000;border-color:var(--y)">v0.2.1</span>
+      </span>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var PAGES = [
+    ['getting-started', 'Getting started'],
+    ['how-it-works', 'How it works'],
+    ['commands', 'Commands'],
+    ['configuration', 'Configuration'],
+    ['providers', 'Providers'],
+    ['privacy', 'Privacy & security'],
+    ['troubleshooting', 'Troubleshooting']
+  ];
+
+  var views = {
+    landing: document.getElementById('view-landing'),
+    docs: document.getElementById('view-docs'),
+    log: document.getElementById('view-log')
+  };
+  var currentView = 'landing';
+  var currentPage = 'getting-started';
+
+  /* ---------- scroll reveal ---------- */
+  var observer = null;
+  if ('IntersectionObserver' in window) {
+    observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) {
+          en.target.classList.add('in');
+          observer.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.12 });
+  }
+  function watchReveals(root) {
+    var els = (root || document).querySelectorAll('.reveal:not(.in)');
+    for (var i = 0; i < els.length; i++) {
+      if (observer) observer.observe(els[i]);
+      else els[i].classList.add('in');
+    }
+  }
+
+  /* ---------- hero word flipper ---------- */
+  /* one word per platform, all short so the headline never re-wraps */
+  var FLIP_WORDS = [
+    { w: 'tweet',   bg: '#FFC900', fg: '#000' },  /* twitter  */
+    { w: 'post',    bg: '#FF90E8', fg: '#000' },  /* linkedin */
+    { w: 'article', bg: '#FFFFFF', fg: '#000' },  /* dev.to   */
+    { w: 'skeet',   bg: '#23A094', fg: '#fff' },  /* bluesky  */
+    { w: 'toot',    bg: '#FFC900', fg: '#000' }   /* mastodon */
+  ];
+  (function initFlipper() {
+    var inner = document.getElementById('flip-word');
+    if (!inner) return;
+    var flip = inner.parentNode;
+    var idx = 0;
+
+    /* lock the box to the widest word so the headline layout never shifts */
+    function sizeToWidest() {
+      var current = inner.textContent, max = 0;
+      flip.style.width = 'auto';
+      for (var i = 0; i < FLIP_WORDS.length; i++) {
+        inner.textContent = FLIP_WORDS[i].w;
+        if (inner.offsetWidth > max) max = inner.offsetWidth;
+      }
+      inner.textContent = current;
+      /* +4 = the box's own 2px left/right borders (border-box sizing) */
+      flip.style.width = (max + 4) + 'px';
+    }
+
+    function cycle() {
+      if (currentView !== 'landing' || document.hidden) return;
+      inner.classList.add('flip-out');
+      setTimeout(function () {
+        idx = (idx + 1) % FLIP_WORDS.length;
+        var next = FLIP_WORDS[idx];
+        inner.textContent = next.w;
+        flip.style.background = next.bg;
+        flip.style.color = next.fg;
+        inner.classList.remove('flip-out');
+        inner.classList.add('flip-in');
+        void inner.offsetWidth; /* commit the below-the-fold position, then slide up */
+        inner.classList.remove('flip-in');
+      }, 220);
+    }
+
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(sizeToWidest);
+    } else {
+      sizeToWidest();
+    }
+    window.addEventListener('resize', sizeToWidest); /* font size is clamp()-based */
+    setInterval(cycle, 2600);
+  })();
+
+  /* ---------- routing ---------- */
+  function showView(name) {
+    for (var k in views) views[k].classList.toggle('on', k === name);
+    currentView = name;
+  }
+
+  function showDocsPage(page) {
+    currentPage = page;
+    var articles = views.docs.querySelectorAll('.doc-page');
+    for (var i = 0; i < articles.length; i++) {
+      var on = articles[i].id === 'doc-' + page;
+      articles[i].classList.remove('on');
+      if (on) {
+        void articles[i].offsetWidth; /* restart the entrance animation */
+        articles[i].classList.add('on');
+      }
+    }
+    var links = views.docs.querySelectorAll('.docs-nav a[href^="#/docs/"]');
+    for (var j = 0; j < links.length; j++) {
+      var target = links[j].getAttribute('href').replace('#/docs/', '');
+      if (target === page) links[j].setAttribute('aria-current', 'page');
+      else links[j].removeAttribute('aria-current');
+    }
+    var idx = -1;
+    for (var n = 0; n < PAGES.length; n++) if (PAGES[n][0] === page) idx = n;
+    var prev = idx > 0 ? PAGES[idx - 1] : null;
+    var next = idx >= 0 && idx < PAGES.length - 1 ? PAGES[idx + 1] : null;
+    var prevEl = document.getElementById('pn-prev');
+    var nextEl = document.getElementById('pn-next');
+    prevEl.style.display = prev ? '' : 'none';
+    nextEl.style.display = next ? '' : 'none';
+    if (prev) { prevEl.href = '#/docs/' + prev[0]; prevEl.textContent = '← ' + prev[1]; }
+    if (next) { nextEl.href = '#/docs/' + next[0]; nextEl.textContent = next[1] + ' →'; }
+    closeMenu();
+  }
+
+  function route() {
+    closeNav();
+    var h = window.location.hash || '';
+    var m = h.match(/^#\/docs(?:\/([a-z-]+))?/);
+    if (m) {
+      var page = 'getting-started';
+      for (var i = 0; i < PAGES.length; i++) if (PAGES[i][0] === m[1]) page = m[1];
+      var changed = currentView !== 'docs' || currentPage !== page;
+      showView('docs');
+      showDocsPage(page);
+      if (changed) window.scrollTo({ top: 0, behavior: 'instant' });
+      document.title = PAGES.filter(function (p) { return p[0] === page; })[0][1] + ' — Beacon docs';
+    } else if (/^#\/changelog/.test(h)) {
+      var was = currentView;
+      showView('log');
+      if (was !== 'log') window.scrollTo({ top: 0, behavior: 'instant' });
+      document.title = 'Changelog — Beacon';
+      watchReveals(views.log);
+    } else {
+      var wasDocs = currentView !== 'landing';
+      showView('landing');
+      document.title = 'Beacon — you ship, Beacon drafts the tweet';
+      var id = h.replace(/^#\/?/, '');
+      if (!id) { if (wasDocs) window.scrollTo({ top: 0, behavior: 'instant' }); return; }
+      requestAnimationFrame(function () {
+        var el = document.getElementById(id);
+        if (el) {
+          var top = el.getBoundingClientRect().top + window.scrollY - 96;
+          window.scrollTo({ top: top, behavior: 'smooth' });
+        }
+      });
+    }
+  }
+
+  /* ---------- mobile main nav ---------- */
+  var navBtn = document.getElementById('nav-btn');
+  var headMenu = document.getElementById('head-menu');
+  function closeNav() {
+    headMenu.setAttribute('data-open', 'false');
+    navBtn.setAttribute('aria-expanded', 'false');
+    navBtn.textContent = '☰';
+  }
+  navBtn.addEventListener('click', function () {
+    var open = headMenu.getAttribute('data-open') === 'true';
+    headMenu.setAttribute('data-open', String(!open));
+    navBtn.setAttribute('aria-expanded', String(!open));
+    navBtn.textContent = open ? '☰' : '✕';
+  });
+  headMenu.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('a')) closeNav();
+  });
+
+  /* ---------- mobile docs menu ---------- */
+  var menuBtn = document.getElementById('menu-btn');
+  var docsNav = document.getElementById('docs-nav');
+  var chev = document.getElementById('menu-chev');
+  function closeMenu() {
+    docsNav.setAttribute('data-open', 'false');
+    menuBtn.setAttribute('aria-expanded', 'false');
+    chev.textContent = '▼';
+  }
+  menuBtn.addEventListener('click', function () {
+    var open = docsNav.getAttribute('data-open') === 'true';
+    docsNav.setAttribute('data-open', String(!open));
+    menuBtn.setAttribute('aria-expanded', String(!open));
+    chev.textContent = open ? '▼' : '▲';
+  });
+
+  /* ---------- copy buttons ---------- */
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-copy]') : null;
+    if (!btn) return;
+    var text = btn.getAttribute('data-copy') || '';
+    var done = function () {
+      if (btn._t) clearTimeout(btn._t);
+      if (!btn._label) btn._label = btn.textContent;
+      btn.textContent = 'copied!';
+      btn.classList.remove('copied-pop');
+      void btn.offsetWidth;
+      btn.classList.add('copied-pop');
+      btn._t = setTimeout(function () { btn.textContent = btn._label; }, 1400);
+    };
+    var fallback = function () {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+      done();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else fallback();
+  });
+
+  window.addEventListener('hashchange', route);
+  route();
+  watchReveals(document);
+})();
+</script>
+
+</body>
+</html>

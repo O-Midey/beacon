@@ -7,7 +7,9 @@ vi.mock("../../src/lib/llm/index.js", async (importActual) => {
   return { ...actual, complete: completeMock };
 });
 
-const { draft, buildDrafterPrompt } = await import("../../src/pipeline/drafter.js");
+const { draft, buildDrafterPrompt, buildSystemPrompt, selectEnabledDrafts } = await import(
+  "../../src/pipeline/drafter.js"
+);
 const { BeaconConfigSchema, isBeaconError } = await import("../../src/types/index.js");
 
 import type {
@@ -91,5 +93,79 @@ describe("draft", () => {
     const call = completeMock.mock.calls[0]![0] as { user: string };
     expect(call.user).not.toContain("sk-ant-secret-value-1234567890abcd");
     expect(call.user).toContain("[REDACTED]");
+  });
+});
+
+describe("buildSystemPrompt", () => {
+  const ConfigSchema = BeaconConfigSchema;
+
+  it("includes only enabled platforms", () => {
+    const cfg = ConfigSchema.parse({
+      apiKey: "test",
+      platforms: { twitter: true, linkedin: false, devto: false, bluesky: true },
+    });
+    const prompt = buildSystemPrompt(cfg);
+    expect(prompt).toContain('"twitter"');
+    expect(prompt).toContain('"bluesky"');
+    expect(prompt).not.toContain('"linkedin"');
+    expect(prompt).not.toContain('"devto"');
+    expect(prompt).not.toContain('"mastodon"');
+  });
+
+  it("uses the configured author identity and language", () => {
+    const cfg = ConfigSchema.parse({
+      apiKey: "test",
+      authorName: "Ada",
+      authorBio: "a compilers engineer",
+      language: "French",
+    });
+    const prompt = buildSystemPrompt(cfg);
+    expect(prompt).toContain("a compilers engineer named Ada");
+    expect(prompt).toContain("Write ALL content in French.");
+  });
+
+  it("falls back to a neutral identity when none is configured", () => {
+    const prompt = buildSystemPrompt(ConfigSchema.parse({ apiKey: "test" }));
+    expect(prompt).toContain("a software engineer");
+    expect(prompt).not.toContain("named");
+  });
+
+  it("appends author notes as high priority", () => {
+    const prompt = buildSystemPrompt(ConfigSchema.parse({ apiKey: "test", authorNotes: "dry humor" }));
+    expect(prompt).toContain("dry humor");
+  });
+});
+
+describe("enabled-platform selection", () => {
+  const ConfigSchema = BeaconConfigSchema;
+
+  const payload = {
+    twitter: { tweets: ["t"], hashtags: ["a", "b"] },
+    linkedin: { hook: "h", body: "b" },
+    devto: { title: "t", tags: ["x"], body: "b" },
+  };
+
+  it("throws API_ERROR when an enabled platform is missing from the response", () => {
+    const cfg = ConfigSchema.parse({ apiKey: "test", platforms: { bluesky: true } });
+    expect(() => selectEnabledDrafts(payload, cfg)).toThrowError(/missing enabled platform/i);
+  });
+
+  it("drops platforms that are not enabled", () => {
+    const cfg = ConfigSchema.parse({
+      apiKey: "test",
+      platforms: { twitter: true, linkedin: false, devto: false },
+    });
+    const selected = selectEnabledDrafts(payload, cfg);
+    expect(selected).toEqual({ twitter: payload.twitter });
+  });
+
+  it("draft() throws CONFIG_MISSING when every platform is disabled", async () => {
+    const cfg = ConfigSchema.parse({
+      apiKey: "test",
+      platforms: { twitter: false, linkedin: false, devto: false },
+    });
+    await expect(draft(snapshot, significance, safety, cfg)).rejects.toSatisfy(
+      (e: unknown) => isBeaconError(e) && e.code === "CONFIG_MISSING",
+    );
   });
 });

@@ -21,6 +21,16 @@ export function createProvider(config: BeaconConfig): LlmProvider {
   }
 }
 
+/**
+ * Validate that the configured provider + key + model actually work, by making
+ * a tiny live completion. Throws a classified BeaconError on failure; resolves
+ * on success. Used by `beacon init` and `beacon doctor`.
+ */
+export async function pingProvider(config: BeaconConfig): Promise<void> {
+  const p = createProvider(config);
+  await p.complete({ system: "Reply with the word OK.", user: "ping", maxTokens: 5 });
+}
+
 let provider: LlmProvider | null = null;
 
 /** Reset the memoised provider. Used by tests; harmless in production. */

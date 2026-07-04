@@ -4,6 +4,63 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.0] - 2026-07-04
+
+### Added
+
+- **`beacon init`** — guided first-run setup: provider, key, model, voice,
+  language, hook install, connection test — ending with a draft from your
+  latest commit so the first session produces real output.
+- **`beacon doctor`** — setup diagnostics: node/git versions, config, API key,
+  hook presence *and* executability, `beacon` on PATH, and a live provider
+  ping. Exits non-zero when a check fails.
+- **Ollama preset** in `beacon init` — fully local, free drafting with no API
+  key (`http://localhost:11434/v1` via the OpenAI-compatible provider).
+- **Digest drafting** — `beacon draft --since <when>`, `--week`, and `--today`
+  combine a range of commits into one draft ("here's what I shipped this
+  week"). Accepts anything `git log --since` understands.
+- **Bluesky and Mastodon platforms** (opt-in:
+  `beacon config set platform bluesky on`). Platform keys in a draft set are
+  now optional; only enabled platforms are drafted and validated, and queue
+  entries from older versions still parse.
+- **Configurable author identity and language** — new config keys
+  `authorName`, `authorBio`, and `language` drive the drafter's voice prompt
+  (previously hardcoded). Drafts can be generated in any language.
+- **Project site** (`design/beacon-site.html`) — single-file landing, docs,
+  and changelog pages; fully responsive, with the main nav collapsing into a
+  toggle menu and a dedicated small-screen typography scale on mobile.
+
+### Changed
+
+- **`beacon review` edit flow** — editing now opens a single platform's draft
+  as plain text (tweets separated by `---`, markdown for dev.to) instead of
+  raw JSON, with structured parts falling back to the original draft when
+  deleted. Edits are still schema-validated on save.
+- The drafter prompt is composed from enabled platforms only, reducing token
+  cost when platforms are toggled off.
+- **CLI output overhauled** — semantic color helpers (TTY- and
+  `NO_COLOR`-aware), a dependency-free spinner that animates on a TTY and
+  degrades to plain lines when piped or inside the git hook, plus a shared
+  first-run nudge and consistent friendly error rendering across commands.
+
+### Fixed
+
+- `QuietSpinner` constructor call passed an argument it did not accept.
+- OpenAI-compatible 401/403 responses now normalize to `AUTH_ERROR` (was
+  `API_ERROR`).
+
+## [0.2.1] - 2026-06-25
+
+### Fixed
+
+- **LLM JSON parsing.** Prompt templates no longer embed `//` comments (which
+  models echoed back, producing invalid JSON). All four templates use clean,
+  comment-free JSON with constraints in prose, plus explicit "no comments / no
+  trailing commas / no fences" instructions. `extractJson` also retries once
+  after stripping trailing commas (without touching `https://` URLs in strings).
+
 ## [0.2.0] - 2026-06-25
 
 ### Added
@@ -19,14 +76,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `beacon config set base-url <url>`.
 - Provider-aware API-key resolution: `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`
   (env vars take precedence over the stored key).
-
-### Fixed
-
-- **LLM JSON parsing.** Prompt templates no longer embed `//` comments (which
-  models echoed back, producing invalid JSON). All four templates use clean,
-  comment-free JSON with constraints in prose, plus explicit "no comments / no
-  trailing commas / no fences" instructions. `extractJson` also retries once
-  after stripping trailing commas (without touching `https://` URLs in strings).
 
 ### Changed
 

@@ -9,6 +9,10 @@ export type BeaconErrorCode =
   | "NO_COMMITS"
   | "SAFETY_CRITICAL_FINDING"
   | "API_ERROR"
+  | "AUTH_ERROR"
+  | "MODEL_NOT_FOUND"
+  | "RATE_LIMITED"
+  | "NETWORK_ERROR"
   | "CONFIG_MISSING"
   | "QUEUE_CORRUPT";
 
@@ -112,25 +116,35 @@ export const DevToDraftSchema = z.object({
 });
 export type DevToDraft = z.infer<typeof DevToDraftSchema>;
 
-export const DraftSetSchema = z.object({
-  twitter: TwitterDraftSchema,
-  linkedin: LinkedInDraftSchema,
-  devto: DevToDraftSchema,
+export const BlueskyDraftSchema = z.object({
+  text: z.string(),
+});
+export type BlueskyDraft = z.infer<typeof BlueskyDraftSchema>;
+
+export const MastodonDraftSchema = z.object({
+  text: z.string(),
+});
+export type MastodonDraft = z.infer<typeof MastodonDraftSchema>;
+
+/**
+ * Every platform key is optional: only the platforms enabled in config are
+ * drafted, and queue entries persisted before a platform existed simply lack
+ * its key. The drafter enforces that each *enabled* platform is present.
+ */
+export const DraftSetPayloadSchema = z.object({
+  twitter: TwitterDraftSchema.optional(),
+  linkedin: LinkedInDraftSchema.optional(),
+  devto: DevToDraftSchema.optional(),
+  bluesky: BlueskyDraftSchema.optional(),
+  mastodon: MastodonDraftSchema.optional(),
+});
+export type DraftSetPayload = z.infer<typeof DraftSetPayloadSchema>;
+
+export const DraftSetSchema = DraftSetPayloadSchema.extend({
   generatedAt: z.coerce.date(),
   commitHash: z.string(),
 });
 export type DraftSet = z.infer<typeof DraftSetSchema>;
-
-/**
- * Shape the drafter LLM returns. It does not produce `generatedAt` /
- * `commitHash` — those are stamped locally — so it is validated separately.
- */
-export const DraftSetPayloadSchema = z.object({
-  twitter: TwitterDraftSchema,
-  linkedin: LinkedInDraftSchema,
-  devto: DevToDraftSchema,
-});
-export type DraftSetPayload = z.infer<typeof DraftSetPayloadSchema>;
 
 /* -------------------------------------------------------------------------- */
 /*  Stage 5 — Queue                                                           */
@@ -160,14 +174,29 @@ export type Queue = z.infer<typeof QueueSchema>;
 /*  Config                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Per-key defaults let config files written before a platform existed still
+ * parse. New platforms default OFF so adding one never silently changes what
+ * existing users generate (or what they pay per draft).
+ */
 export const PlatformTogglesSchema = z.object({
-  twitter: z.boolean(),
-  linkedin: z.boolean(),
-  devto: z.boolean(),
+  twitter: z.boolean().default(true),
+  linkedin: z.boolean().default(true),
+  devto: z.boolean().default(true),
+  bluesky: z.boolean().default(false),
+  mastodon: z.boolean().default(false),
 });
 export type PlatformToggles = z.infer<typeof PlatformTogglesSchema>;
 
 export type PlatformName = keyof PlatformToggles;
+
+export const PLATFORM_NAMES: readonly PlatformName[] = [
+  "twitter",
+  "linkedin",
+  "devto",
+  "bluesky",
+  "mastodon",
+] as const;
 
 /** Supported LLM providers. `openai` covers any OpenAI-compatible endpoint. */
 export const ProviderNameSchema = z.enum(["anthropic", "openai"]);
@@ -182,12 +211,14 @@ export const BeaconConfigSchema = z.object({
    */
   baseUrl: z.string().optional(),
   significanceThreshold: z.number().min(0).max(10).default(6),
+  /** Display name used in the drafter's voice prompt (first person is "I"). */
+  authorName: z.string().optional(),
+  /** Short self-description, e.g. "a Lagos-based AI and blockchain engineer". */
+  authorBio: z.string().optional(),
   authorNotes: z.string().optional(),
-  platforms: PlatformTogglesSchema.default({
-    twitter: true,
-    linkedin: true,
-    devto: true,
-  }),
+  /** Language all drafts are written in. Any language name works. */
+  language: z.string().default("English"),
+  platforms: PlatformTogglesSchema.default({}),
   model: z.string().default("claude-sonnet-4-6"),
   maxDiffChars: z.number().int().positive().default(8000),
 });

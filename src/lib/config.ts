@@ -80,6 +80,12 @@ export function resolveApiKey(config: BeaconConfig): string {
   );
 }
 
+/** Whether an API key is resolvable for the configured provider (no throw). */
+export function hasApiKey(config: BeaconConfig): boolean {
+  const envName = PROVIDER_ENV[config.provider];
+  return Boolean(process.env[envName]?.trim() || config.apiKey.trim());
+}
+
 /** Mask a key for display, e.g. `sk-ant…f9a2`. */
 export function maskKey(key: string): string {
   if (!key) return "(not set)";

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDigestMessage,
+  getRangeSnapshot,
   getSnapshot,
   parseFilesChanged,
+  parseHashList,
   parseLog,
   parseNumstat,
   truncateDiff,
@@ -113,5 +116,82 @@ describe("getSnapshot (injected runner)", () => {
       return "";
     };
     expect(() => getSnapshot(8000, run)).toThrowError(/git repository/i);
+  });
+});
+
+describe("parseHashList", () => {
+  it("returns trimmed non-empty hashes", () => {
+    expect(parseHashList("aaa\nbbb\n\n")).toEqual(["aaa", "bbb"]);
+  });
+  it("returns empty array for empty input", () => {
+    expect(parseHashList("")).toEqual([]);
+  });
+});
+
+describe("buildDigestMessage", () => {
+  it("renders oldest-first with a count", () => {
+    const msg = buildDigestMessage("ccc newest change\nbbb middle change\naaa first change\n", "yesterday");
+    expect(msg).toBe(
+      "Digest of 3 commits since yesterday:\n- aaa first change\n- bbb middle change\n- ccc newest change",
+    );
+  });
+  it("uses singular for one commit", () => {
+    expect(buildDigestMessage("aaa only change\n", "midnight")).toContain("Digest of 1 commit since midnight");
+  });
+});
+
+describe("getRangeSnapshot (injected runner)", () => {
+  const NEWEST = "f".repeat(40);
+  const OLDEST = "a".repeat(40);
+
+  it("digests a multi-commit range against the oldest commit's parent", () => {
+    const run = (args: string[]): string => {
+      const key = args.join(" ");
+      if (key.startsWith("rev-parse --is-inside-work-tree")) return "true\n";
+      if (key === "log --since=yesterday --format=%H") return `${NEWEST}\n${OLDEST}\n`;
+      if (key === `rev-parse --verify ${OLDEST}^`) return "parenthash\n";
+      if (key === "log --since=yesterday --format=%h %s") return "fffffff newest\naaaaaaa oldest\n";
+      if (key === `diff --name-only ${OLDEST}^ ${NEWEST}`) return "src/a.ts\nsrc/b.ts";
+      if (key === `diff --numstat ${OLDEST}^ ${NEWEST}`) return "7\t2\tsrc/a.ts\n1\t0\tsrc/b.ts";
+      if (key === `diff ${OLDEST}^ ${NEWEST}`) return "+combined diff";
+      throw new Error(`unexpected git call: ${key}`);
+    };
+    const snap = getRangeSnapshot("yesterday", 8000, run);
+    expect(snap.commitHash).toBe(`${OLDEST.slice(0, 7)}..${NEWEST.slice(0, 7)}`);
+    expect(snap.commitMessage).toContain("Digest of 2 commits since yesterday");
+    expect(snap.commitMessage).toContain("- aaaaaaa oldest\n- fffffff newest");
+    expect(snap.filesChanged).toEqual(["src/a.ts", "src/b.ts"]);
+    expect(snap.insertions).toBe(8);
+    expect(snap.deletions).toBe(2);
+    expect(snap.diff).toBe("+combined diff");
+  });
+
+  it("falls back to the empty tree when the range reaches the root commit", () => {
+    const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+    const run = (args: string[]): string => {
+      const key = args.join(" ");
+      if (key.startsWith("rev-parse --is-inside-work-tree")) return "true\n";
+      if (key === "log --since=midnight --format=%H") return `${OLDEST}\n`;
+      if (key === `rev-parse --verify ${OLDEST}^`) throw new Error("no parent");
+      if (key === `cat-file -t ${EMPTY_TREE}`) return "tree\n";
+      if (key === "log --since=midnight --format=%h %s") return "aaaaaaa root commit\n";
+      if (key.startsWith(`diff --name-only ${EMPTY_TREE}`)) return "README.md";
+      if (key.startsWith(`diff --numstat ${EMPTY_TREE}`)) return "3\t0\tREADME.md";
+      if (key.startsWith(`diff ${EMPTY_TREE}`)) return "+# Title";
+      throw new Error(`unexpected git call: ${key}`);
+    };
+    const snap = getRangeSnapshot("midnight", 8000, run);
+    expect(snap.filesChanged).toEqual(["README.md"]);
+    expect(snap.commitMessage).toContain("Digest of 1 commit");
+  });
+
+  it("throws NO_COMMITS when the window is empty", () => {
+    const run = (args: string[]): string => {
+      const key = args.join(" ");
+      if (key.startsWith("rev-parse --is-inside-work-tree")) return "true\n";
+      if (key.startsWith("log --since=")) return "\n";
+      throw new Error(`unexpected git call: ${key}`);
+    };
+    expect(() => getRangeSnapshot("1 week ago", 8000, run)).toThrowError(/no commits found/i);
   });
 });

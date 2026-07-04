@@ -1,6 +1,8 @@
-import { loadConfig } from "../../lib/config.js";
+import { c } from "../../lib/colors.js";
+import { hasApiKey, loadConfig } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
-import { runPipeline } from "../../pipeline/index.js";
+import { startSpinner, type Spinner } from "../../lib/spinner.js";
+import { runPipeline, type PipelineStage } from "../../pipeline/index.js";
 import { isBeaconError } from "../../types/index.js";
 
 /**
@@ -14,36 +16,62 @@ export interface RunOptions {
   silent?: boolean;
 }
 
+const STAGE_LABEL: Record<PipelineStage, string> = {
+  capture: "Reading the latest commit…",
+  safety: "Scanning for secrets…",
+  significance: "Assessing significance…",
+  draft: "Drafting posts…",
+  queue: "Saving to the review queue…",
+};
+
 export async function runCommand(options: RunOptions = {}): Promise<void> {
   const silent = options.silent ?? false;
 
   try {
     const config = loadConfig();
-    const outcome = await runPipeline(config);
+
+    if (!hasApiKey(config)) {
+      const msg = "Beacon: no API key configured — skipping. Run `beacon init`.";
+      logger.file("warn", msg);
+      if (!silent) logger.warn(msg);
+      return;
+    }
+
+    // A spinner only when interactive (manual `beacon run`); the hook is silent.
+    const spinner: Spinner | null = silent ? null : startSpinner("Starting…");
+    const outcome = await runPipeline(config, {
+      onStage: (stage) => spinner?.update(STAGE_LABEL[stage]),
+    });
 
     switch (outcome.kind) {
       case "not_significant": {
-        const msg = `Beacon: commit not significant (score: ${outcome.significance.score}/10) — skipped`;
-        logger.file("info", msg);
-        if (!silent) logger.info(msg);
+        const msg = `commit not significant (score: ${outcome.significance.score}/10) — skipped`;
+        logger.file("info", `Beacon: ${msg}`);
+        spinner?.stop();
+        if (!silent) logger.info(`Beacon: ${msg}`);
         return;
       }
       case "blocked_unsafe": {
         const criticals = outcome.safety.findings.filter((f) => f.severity === "critical");
-        const detail = criticals
-          .map((f) => `${f.pattern} @ diff line ${f.line}`)
-          .join(", ");
+        const detail = criticals.map((f) => `${f.pattern} @ diff line ${f.line}`).join(", ");
         const msg = `Beacon: drafting blocked — critical safety findings: ${detail}`;
         logger.file("error", msg);
-        // Surface to stderr so the developer notices a secret was caught,
-        // but do not throw (keeps the commit clean).
-        logger.warn(msg);
+        spinner?.fail(c.error(msg));
+        if (silent) logger.warn(msg);
         return;
       }
       case "queued": {
-        const msg = `Beacon: draft queued (score: ${outcome.significance.score}/10) — run \`beacon review\` to see it`;
-        logger.file("info", `${msg} [id=${outcome.entryId}]`);
-        if (!silent) logger.success(msg);
+        const msg = `draft queued (score: ${outcome.significance.score}/10) — run \`beacon review\` to see it`;
+        logger.file("info", `Beacon: ${msg} [id=${outcome.entryId}]`);
+        if (spinner) {
+          spinner.succeed(
+            `Beacon: draft queued ${c.dim(`(score ${outcome.significance.score}/10)`)} — run ${c.code(
+              "beacon review",
+            )}`,
+          );
+        } else {
+          logger.success(`Beacon: ${msg}`);
+        }
         return;
       }
     }
@@ -57,7 +85,7 @@ export async function runCommand(options: RunOptions = {}): Promise<void> {
     if (isBeaconError(err) && err.context) {
       logger.file("error", `context: ${JSON.stringify(err.context)}`);
     }
-    // Non-critical: do not throw to stdout. The hook stays quiet; details live
+    // Non-critical: never throw to stdout. The hook stays quiet; details live
     // in the log file.
     if (!silent) logger.warn(`Beacon: ${message} (see ~/.beacon/beacon.log)`);
   }

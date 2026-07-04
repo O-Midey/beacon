@@ -8,6 +8,7 @@ import {
   unlinkSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
+import { c } from "./colors.js";
 import { beaconLogPath } from "./paths.js";
 
 /**
@@ -24,10 +25,10 @@ import { beaconLogPath } from "./paths.js";
  */
 
 const symbols = {
-  success: "✓",
-  error: "✗",
-  warn: "⚠",
-  info: "•",
+  success: c.success("✓"),
+  error: c.error("✗"),
+  warn: c.warn("⚠"),
+  info: c.info("•"),
 } as const;
 
 export const MAX_LOG_AGE_DAYS = 7;

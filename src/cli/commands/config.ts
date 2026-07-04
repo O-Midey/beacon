@@ -1,6 +1,11 @@
 import { loadConfig, maskKey, saveConfig } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
-import { BeaconError, ProviderNameSchema, type PlatformName } from "../../types/index.js";
+import {
+  BeaconError,
+  PLATFORM_NAMES,
+  ProviderNameSchema,
+  type PlatformName,
+} from "../../types/index.js";
 
 /**
  * `beacon config` — manage `~/.beacon/config.json`.
@@ -9,9 +14,12 @@ import { BeaconError, ProviderNameSchema, type PlatformName } from "../../types/
  *   beacon config set api-key <key>
  *   beacon config set base-url <url>            (OpenAI-compatible only)
  *   beacon config set significance-threshold <0-10>
+ *   beacon config set author-name <name>
+ *   beacon config set author-bio <text...>
  *   beacon config set author-notes <text...>
+ *   beacon config set language <language>
  *   beacon config set model <model>
- *   beacon config set platform <twitter|linkedin|devto> <on|off>
+ *   beacon config set platform <twitter|linkedin|devto|bluesky|mastodon> <on|off>
  *   beacon config show
  */
 
@@ -58,6 +66,27 @@ function setAuthorNotes(value: string): void {
   logger.success("author-notes updated");
 }
 
+function setAuthorName(value: string): void {
+  const config = loadConfig();
+  config.authorName = value.trim();
+  saveConfig(config);
+  logger.success(`author-name set to ${config.authorName}`);
+}
+
+function setAuthorBio(value: string): void {
+  const config = loadConfig();
+  config.authorBio = value.trim();
+  saveConfig(config);
+  logger.success("author-bio updated");
+}
+
+function setLanguage(value: string): void {
+  const config = loadConfig();
+  config.language = value.trim();
+  saveConfig(config);
+  logger.success(`language set to ${config.language}`);
+}
+
 function setModel(value: string): void {
   const config = loadConfig();
   config.model = value.trim();
@@ -67,8 +96,8 @@ function setModel(value: string): void {
 
 function setPlatform(name: string, state: string): void {
   const platform = name as PlatformName;
-  if (platform !== "twitter" && platform !== "linkedin" && platform !== "devto") {
-    throw new BeaconError("platform must be one of: twitter, linkedin, devto", "CONFIG_MISSING");
+  if (!PLATFORM_NAMES.includes(platform)) {
+    throw new BeaconError(`platform must be one of: ${PLATFORM_NAMES.join(", ")}`, "CONFIG_MISSING");
   }
   const on = state === "on" || state === "true" || state === "1";
   const config = loadConfig();
@@ -110,6 +139,18 @@ export function configSetCommand(field: string, values: string[]): void {
       requireValue(field, value);
       setAuthorNotes(value);
       return;
+    case "author-name":
+      requireValue(field, value);
+      setAuthorName(value);
+      return;
+    case "author-bio":
+      requireValue(field, value);
+      setAuthorBio(value);
+      return;
+    case "language":
+      requireValue(field, value);
+      setLanguage(value);
+      return;
     case "model":
       requireValue(field, value);
       setModel(value);
@@ -123,7 +164,7 @@ export function configSetCommand(field: string, values: string[]): void {
     }
     default:
       throw new BeaconError(
-        `Unknown config field: ${field}. Valid: provider, api-key, base-url, significance-threshold, author-notes, model, platform`,
+        `Unknown config field: ${field}. Valid: provider, api-key, base-url, significance-threshold, author-name, author-bio, author-notes, language, model, platform`,
         "CONFIG_MISSING",
       );
   }

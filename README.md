@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178c6?logo=typescript)](https://www.typescriptlang.org)
 
-Beacon installs a `post-commit` git hook that reads your diff and commit message, runs it through a **significance filter → secret scanner → voice drafter**, and writes platform-specific drafts to a local review queue for **Twitter/X**, **LinkedIn**, and **dev.to**.
+Beacon installs a `post-commit` git hook that reads your diff and commit message, runs it through a **significance filter → secret scanner → voice drafter**, and writes platform-specific drafts to a local review queue for **Twitter/X**, **LinkedIn**, **dev.to**, **Bluesky**, and **Mastodon**.
 
 **Nothing is ever published automatically.** You always review, edit, approve, or discard before anything leaves your machine.
 
@@ -14,13 +14,41 @@ There is no server, no database, and no cloud sync. Two JSON files under `~/.bea
 
 ---
 
+## Quick start
+
+```bash
+npm install -g beacon-bip
+beacon init
+```
+
+`beacon init` walks you through provider, key, voice, and language, installs the git hook, and drafts from your latest commit — you see real output before setup ends. Then just commit as usual.
+
+```bash
+beacon review   # review, edit, approve or discard pending drafts
+beacon doctor   # diagnose your setup if anything misbehaves
+```
+
+### No API key? Use a local model
+
+Beacon works fully offline with [Ollama](https://ollama.com) — pick **Ollama** in `beacon init` and no key is ever needed:
+
+```bash
+ollama pull llama3.1
+beacon init     # choose "Ollama (local model — free, fully offline)"
+```
+
+Privacy-first product, privacy-first model: with Ollama your diff never leaves your machine at all.
+
+---
+
 ## Why Beacon?
 
 - **Zero friction** — commit normally; drafts appear in the background.
 - **Secret-safe** — a regex scanner runs *before* any LLM call. A leaked key blocks drafting entirely; secrets are redacted from everything the model sees.
-- **Voice-consistent** — one prompt, your author notes, three platform-adapted drafts.
+- **Voice-consistent** — your identity, voice notes, and language from config; platform-adapted drafts from one prompt.
 - **Opinionated filter** — routine refactors, typo fixes, and dep bumps are skipped automatically (configurable threshold).
-- **100% local** — your diff, your API key, your machine.
+- **Digest mode** — `beacon draft --week` turns a week of commits into one "here's what I shipped" post.
+- **100% local** — your diff, your API key (or local model), your machine.
 
 ---
 
@@ -28,61 +56,26 @@ There is no server, no database, and no cloud sync. Two JSON files under `~/.bea
 
 The pipeline is five strictly-separated stages:
 
-```
+```text
 capture → safety → significance → draft → queue
 ```
 
 | Stage | What it does |
-|---|---|
-| **Capture** | Reads `git diff HEAD~1 HEAD`, the commit message, and changed-file stats into a typed snapshot. Diff is truncated for cost control. |
+| --- | --- |
+| **Capture** | Reads the commit (or commit range) diff, message, and changed-file stats into a typed snapshot. Diff is truncated for cost control. |
 | **Safety** | Regex-only scan (no LLM) for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. Runs before *any* LLM call. **Critical findings block drafting; warnings are redacted.** |
 | **Significance** | An LLM call scores the commit 0–10 (on the redacted diff). Routine changes fall below the threshold (default: 6) and are skipped. |
-| **Draft** | A single LLM call produces all three platform drafts in your voice, receiving only the redacted diff. |
+| **Draft** | A single LLM call produces drafts for every **enabled** platform, in your voice and language, receiving only the redacted diff. |
 | **Queue** | Drafts are persisted atomically to `~/.beacon/queue.json` (capped at 50 entries) for `beacon review`. |
-
----
-
-## Install
-
-```bash
-npm install
-npm run build
-npm link        # exposes `beacon` globally
-```
-
-Requires **Node.js 20+**.
-
----
-
-## Setup
-
-```bash
-# Default provider is Anthropic. Store your key (written to ~/.beacon/config.json, mode 0600)
-beacon config set api-key sk-ant-...
-# …or export ANTHROPIC_API_KEY in your shell (takes precedence)
-
-beacon config set significance-threshold 6
-beacon config set model claude-sonnet-4-6
-beacon config set author-notes "Prefers dry humor; avoid hashtags on LinkedIn."
-beacon config show   # API key is masked
-```
-
-### Using a different provider
-
-Beacon also supports any **OpenAI-compatible** endpoint (OpenAI, OpenRouter, Groq, Together, a local server, …):
-
-```bash
-beacon config set provider openai
-beacon config set model gpt-4o-mini
-beacon config set base-url https://api.openai.com/v1   # or e.g. https://openrouter.ai/api/v1
-beacon config set api-key sk-...                       # or export OPENAI_API_KEY
-```
 
 ---
 
 ## Usage
 
 ```bash
+# Guided setup (provider, key, voice, hook, first draft)
+beacon init
+
 # Install the post-commit hook in the current repo
 beacon install
 
@@ -95,14 +88,45 @@ beacon review
 beacon draft
 beacon draft --message "Shipped the new auth flow"
 beacon draft --file notes/feature.md
+
+# Digest mode: one draft from a range of commits
+beacon draft --today                 # everything committed today
+beacon draft --week                  # the last 7 days
+beacon draft --since "3 days ago"    # anything `git log --since` accepts
+
+# Health check: node, git, config, hook, PATH, live provider ping
+beacon doctor
 ```
 
-In `beacon review`, each pending entry shows its significance score and all three drafts, then offers:
+In `beacon review`, each pending entry shows its significance score and every drafted platform, then offers:
 
 - **approve** — copies the chosen platform draft to your clipboard
-- **edit** — opens `$EDITOR` with the draft as validated JSON
+- **edit** — opens `$EDITOR` on one platform's draft as **plain text** (never JSON), validated on save
 - **discard** — removes the entry from the queue
 - **skip** — leaves it for later
+
+---
+
+## Providers
+
+The default provider is **Anthropic**. Beacon also supports any **OpenAI-compatible** endpoint (OpenAI, OpenRouter, Groq, Together, a local server, …) and **Ollama** for fully-local drafting:
+
+```bash
+# Anthropic (default)
+beacon config set api-key sk-ant-...          # or export ANTHROPIC_API_KEY
+
+# OpenAI-compatible
+beacon config set provider openai
+beacon config set model gpt-4o-mini
+beacon config set base-url https://api.openai.com/v1   # or e.g. https://openrouter.ai/api/v1
+beacon config set api-key sk-...                       # or export OPENAI_API_KEY
+
+# Ollama (local, no key)
+beacon config set provider openai
+beacon config set base-url http://localhost:11434/v1
+beacon config set model llama3.1
+beacon config set api-key ollama
+```
 
 ---
 
@@ -112,12 +136,15 @@ All config lives in `~/.beacon/config.json` (mode `0600`).
 
 | Key | Default | Notes |
 | --- | --- | --- |
-| `provider` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible endpoint). |
+| `provider` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible endpoint, incl. Ollama). |
 | `apiKey` | `""` | Provider env var (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) overrides it. |
 | `baseUrl` | — | Base URL for the `openai` provider. Ignored for `anthropic`. |
 | `significanceThreshold` | `6` | Minimum score (0–10) to draft. Lower = more drafts. |
-| `authorNotes` | — | Appended to the drafter's voice prompt. |
-| `platforms` | all `true` | Toggle `twitter` / `linkedin` / `devto` individually. |
+| `authorName` | — | Your name, used in the drafter's voice prompt. |
+| `authorBio` | — | How posts describe you, e.g. `"a fullstack engineer building devtools"`. |
+| `authorNotes` | — | Voice notes appended to the drafter prompt (tone, phrases to avoid…). |
+| `language` | `English` | Language all drafts are written in — any language name works. |
+| `platforms` | see notes | `twitter` / `linkedin` / `devto` on, `bluesky` / `mastodon` off. Toggle each with `beacon config set platform <name> <on\|off>`. |
 | `model` | `claude-sonnet-4-6` | Model ID for the active provider. |
 | `maxDiffChars` | `8000` | Diff truncation limit before LLM calls. |
 
@@ -126,21 +153,23 @@ All config lives in `~/.beacon/config.json` (mode `0600`).
 ## Development
 
 ```bash
+npm install
 npm run typecheck   # tsc --noEmit (strict)
-npm test            # vitest — no real API calls; the Anthropic SDK is mocked
+npm test            # vitest — no real API calls; providers are mocked
 npm run build       # tsup → dist/
+npm link            # exposes `beacon` globally from your working copy
 ```
 
 ### Project layout
 
 ```text
 src/
-  cli/         Commander entry point + commands (run, install, review, draft, config)
+  cli/         Commander entry point + commands (init, doctor, run, install, review, draft, config)
   pipeline/    The five stages + a thin orchestrator (index.ts)
-  platforms/   Per-platform prompt config + output schema
-  lib/         Git, config, LLM providers (llm/: anthropic + openai), formatting, paths, logger
+  platforms/   Per-platform prompt config + output schema (add a platform = add one file)
+  lib/         Git, config, LLM providers (llm/: anthropic + openai), edit round-trip, formatting, paths, logger
   types/       All shared types + Zod schemas + BeaconError
-tests/         Vitest specs (safety, git, queue, significance, drafter)
+tests/         Vitest specs (safety, git, queue, significance, drafter, edit, compat)
 hooks/         post-commit template
 ```
 

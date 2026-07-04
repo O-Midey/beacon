@@ -1,5 +1,6 @@
 import { BeaconError, type BeaconConfig } from "../../types/index.js";
 import { resolveApiKey } from "../config.js";
+import { classifyLlmError } from "./errors.js";
 import type { CompletionParams, LlmProvider } from "./types.js";
 
 /**
@@ -19,12 +20,14 @@ interface ChatCompletionResponse {
 
 export class OpenAiProvider implements LlmProvider {
   readonly name = "openai";
+  private readonly config: BeaconConfig;
   private readonly apiKey: string;
   private readonly model: string;
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchFn;
 
   constructor(config: BeaconConfig, fetchImpl: FetchFn = fetch) {
+    this.config = config;
     this.apiKey = resolveApiKey(config);
     this.model = config.model;
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
@@ -55,17 +58,19 @@ export class OpenAiProvider implements LlmProvider {
         body: JSON.stringify(this.buildBody(params)),
       });
     } catch (err) {
-      throw new BeaconError("OpenAI-compatible request failed", "API_ERROR", {
+      // Transport-level failure (DNS, refused, timeout, …) — no HTTP status.
+      throw classifyLlmError({
+        config: this.config,
         cause: err instanceof Error ? err.message : String(err),
-        baseUrl: this.baseUrl,
       });
     }
 
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      throw new BeaconError("OpenAI-compatible request returned an error status", "API_ERROR", {
+      throw classifyLlmError({
+        config: this.config,
         status: res.status,
-        detail: detail.slice(0, 500),
+        cause: detail.slice(0, 500),
       });
     }
 

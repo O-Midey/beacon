@@ -1,25 +1,51 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
+import { c } from "../../lib/colors.js";
 import { loadConfig } from "../../lib/config.js";
-import { getSnapshot } from "../../lib/git.js";
+import { getRangeSnapshot, getSnapshot } from "../../lib/git.js";
 import { logger } from "../../lib/logger.js";
-import { runPipeline } from "../../pipeline/index.js";
+import { startSpinner } from "../../lib/spinner.js";
+import { runPipeline, type PipelineStage } from "../../pipeline/index.js";
 import { BeaconError, isBeaconError, type WorkspaceSnapshot } from "../../types/index.js";
+import { ensureConfigured, reportPipelineError } from "./shared.js";
 
 /**
  * `beacon draft` — manual trigger.
  *
  *   --message <text>  override the commit-message context
  *   --file <path>     use a markdown/text file as context instead of the git diff
+ *   --since <when>    digest every commit since <when> ("yesterday", "3 days ago", a date)
+ *   --week / --today  digest shorthands for the last 7 days / since midnight
  *
- * Useful for drafting posts about work that is not yet committed. Always runs
- * the full pipeline with the significance gate forced open (the user asked for
- * a draft explicitly), and still passes content through the safety scanner.
+ * Useful for drafting posts about work that is not yet committed, or for the
+ * "what I shipped this week" digest rhythm. Always runs the full pipeline with
+ * the significance gate forced open (the user asked for a draft explicitly),
+ * and still passes content through the safety scanner.
  */
 export interface DraftOptions {
   message?: string;
   file?: string;
+  since?: string;
+  week?: boolean;
+  today?: boolean;
 }
+
+/** Resolve the digest window, if any. Digest flags conflict with --file. */
+function resolveSince(options: DraftOptions): string | undefined {
+  const since = options.since ?? (options.week ? "7 days ago" : options.today ? "midnight" : undefined);
+  if (since && options.file) {
+    throw new BeaconError("--since/--week/--today cannot be combined with --file", "CONFIG_MISSING");
+  }
+  return since;
+}
+
+const STAGE_LABEL: Record<PipelineStage, string> = {
+  capture: "Reading workspace…",
+  safety: "Scanning for secrets…",
+  significance: "Assessing significance…",
+  draft: "Drafting posts in your voice…",
+  queue: "Saving to the review queue…",
+};
 
 /** Build a synthetic snapshot from a context file (no git needed). */
 function snapshotFromFile(filePath: string, message: string | undefined): WorkspaceSnapshot {
@@ -42,44 +68,58 @@ function snapshotFromFile(filePath: string, message: string | undefined): Worksp
 
 export async function draftCommand(options: DraftOptions = {}): Promise<void> {
   const config = loadConfig();
+  if (!ensureConfigured(config)) return;
 
   let snapshot: WorkspaceSnapshot;
+  const since = resolveSince(options);
   if (options.file) {
     snapshot = snapshotFromFile(options.file, options.message);
   } else {
-    // Capture from git, then optionally override the commit message.
-    snapshot = getSnapshot(config.maxDiffChars);
+    snapshot = since ? getRangeSnapshot(since, config.maxDiffChars) : getSnapshot(config.maxDiffChars);
     if (options.message) {
       snapshot = { ...snapshot, commitMessage: options.message };
     }
   }
 
+  const spinner = startSpinner("Starting…");
   try {
-    const outcome = await runPipeline(config, { snapshot, force: true });
+    const outcome = await runPipeline(config, {
+      snapshot,
+      force: true,
+      onStage: (stage) => spinner.update(STAGE_LABEL[stage]),
+    });
+
     switch (outcome.kind) {
       case "blocked_unsafe": {
         const detail = outcome.safety.findings
           .filter((f) => f.severity === "critical")
           .map((f) => `${f.pattern} @ line ${f.line}`)
           .join(", ");
-        logger.error(`Drafting blocked — critical safety findings: ${detail}`);
+        spinner.fail(c.error(`Blocked — critical safety findings: ${detail}`));
+        logger.plain(c.dim("Nothing was sent to the model. Remove the secret(s) and try again."));
         process.exitCode = 1;
         return;
       }
       case "queued": {
-        logger.success(
-          `Draft queued (significance ${outcome.significance.score}/10) — run \`beacon review\` to see it`,
+        spinner.succeed(
+          `Draft queued ${c.dim(`(significance ${outcome.significance.score}/10)`)} — run ${c.code(
+            "beacon review",
+          )} to see it`,
         );
         return;
       }
       case "not_significant":
-        // Unreachable with force:true, but handled for exhaustiveness.
+        spinner.stop();
         logger.info("Nothing queued.");
         return;
     }
   } catch (err) {
-    const message = isBeaconError(err) ? `[${err.code}] ${err.message}` : String(err);
-    logger.error(message);
+    spinner.fail();
+    if (isBeaconError(err)) {
+      reportPipelineError(err);
+    } else {
+      logger.error(String(err));
+    }
     process.exitCode = 1;
   }
 }
