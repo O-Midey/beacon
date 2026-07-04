@@ -43,7 +43,7 @@
     "url": "https://github.com/O-Midey/beacon/issues"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@inquirer/prompts": "^7.2.1",
     "clipboardy": "^4.0.0",
     "commander": "^12.1.0",
