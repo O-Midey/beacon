@@ -60,7 +60,12 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 
 /* ---------- hero ---------- */
 .sec { border-bottom: 2px solid #000; }
-.hero-inner { padding-top: 64px; padding-bottom: 80px; position: relative; }
+/* hero fills the first screen (minus the sticky header); ticker sits on its bottom edge */
+.hero-sec { display: flex; flex-direction: column; min-height: calc(100vh - 66px); min-height: calc(100svh - 66px); }
+.hero-sec .hero-inner { flex: 1; display: flex; align-items: center; width: 100%; }
+.hero-sec .hero-grid { width: 100%; }
+.hero-sec .ticker { border-top: 2px solid #000; border-bottom: none; }
+.hero-inner { padding-top: 40px; padding-bottom: 48px; position: relative; }
 .hero-grid { display: grid; grid-template-columns: 1.04fr 0.96fr; gap: 56px; align-items: center; }
 .hero-inner h1 { font-weight: 800; font-size: clamp(2.5rem, 4.9vw, 4.4rem); line-height: 1.04; letter-spacing: -0.035em; margin-bottom: 22px; text-wrap: balance; }
 .hero-inner .lede { font-size: clamp(1.05rem, 1.6vw, 1.25rem); line-height: 1.55; margin-bottom: 28px; max-width: 52ch; }

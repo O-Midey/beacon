@@ -14,8 +14,8 @@ export default function LandingPage() {
       <SiteHeader variant="landing" />
 
       <main id="main">
-        {/* HERO */}
-        <section className="sec">
+        {/* HERO — fills the viewport below the header; ticker pinned at the bottom */}
+        <section className="sec hero-sec">
           <div className="wrap hero-inner">
             <div className="hero-grid">
               <div className="hero-copy">
@@ -86,15 +86,15 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
 
-        {/* TICKER */}
-        <div className="ticker" aria-hidden="true">
-          <div className="ticker-track">
-            <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
-            <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+          {/* TICKER — bottom edge of the first screen */}
+          <div className="ticker" aria-hidden="true">
+            <div className="ticker-track">
+              <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+              <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+            </div>
           </div>
-        </div>
+        </section>
 
         {/* HOW IT WORKS */}
         <section id="how-it-works" className="sec">

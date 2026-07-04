@@ -20,6 +20,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the dedicated small-screen typography scale at ≤640px. Flip word is
   static under `prefers-reduced-motion` and pauses on hidden tabs.
 
+### Changed
+
+- **Full-screen hero** — the landing hero now fills the viewport below the
+  header, with the marquee ticker pinned to the bottom edge of the first
+  screen.
+- The beacon GitHub repository is now public (required for the README GIF,
+  npm page image, and every "Star on GitHub" link to work).
+
 ### Fixed
 
 - README pipeline description now matches the actual stage order (secret
