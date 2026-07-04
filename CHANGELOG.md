@@ -10,38 +10,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **Production website** (`site/`) — Next.js App Router port of the project
-  site, deployed at <https://beacon-bip.vercel.app> with push-to-deploy from
-  `main`. Docs are MDX pages; the changelog timeline is generated from this
-  file at build time.
-- **README demo GIF** (`assets/demo.gif`) — `beacon init` → commit →
-  `beacon review`, recorded with vhs against a local mock model.
-- **Site now matches the reworked mockup** — two-column hero with the
-  width-locked platform flip word (tweet/post/article/skeet/toot, per-platform
-  colors), platform chips row, main nav collapsing into a ☰ menu at ≤900px,
-  and the dedicated small-screen typography scale at ≤640px. Flip word is
-  static under `prefers-reduced-motion` and pauses on hidden tabs.
+- **Production website** — Next.js port of the project site at
+  [beacon-bip.vercel.app](https://beacon-bip.vercel.app); docs in MDX,
+  changelog page generated from this file at build time.
+- **README demo GIF** showing `beacon init` → commit → `beacon review`.
 
 ### Changed
 
-- **Full-screen hero** — the landing hero now fills the viewport below the
-  header, with the marquee ticker pinned to the bottom edge of the first
-  screen.
-- The beacon GitHub repository is now public (required for the README GIF,
-  npm page image, and every "Star on GitHub" link to work).
-- CI now runs the CLI checks on a Node 20 + 22 matrix and builds the site as
-  a second job.
+- Site redesigned to match the new mockup: full-viewport hero with the
+  platform flip word, responsive nav and type scale on mobile.
+- The beacon GitHub repository is now public.
 
 ### Fixed
 
-- **`punycode` DeprecationWarning (DEP0040) no longer pollutes CLI output** on
-  Node ≥ 21 — upgraded `@anthropic-ai/sdk` 0.32.1 → 0.110.0, which uses native
-  fetch and drops the `node-fetch → whatwg-url → punycode` chain entirely.
-- README pipeline description now matches the actual stage order (secret
-  scanner before the significance filter, as of 0.2.0).
-- Site favicon now adapts to dark browser chrome — transparent background and
-  a `prefers-color-scheme` media query inside the SVG flip the black strokes
-  to cream in dark mode.
+- `punycode` DeprecationWarning no longer pollutes CLI output on Node ≥ 21
+  (upgraded `@anthropic-ai/sdk` to 0.110).
+- README pipeline description now matches the actual stage order.
+- Site favicon adapts to dark browser chrome.
 
 ## [0.3.0] - 2026-07-04
 
@@ -92,11 +77,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- **LLM JSON parsing.** Prompt templates no longer embed `//` comments (which
-  models echoed back, producing invalid JSON). All four templates use clean,
-  comment-free JSON with constraints in prose, plus explicit "no comments / no
-  trailing commas / no fences" instructions. `extractJson` also retries once
-  after stripping trailing commas (without touching `https://` URLs in strings).
+- **LLM JSON parsing.** Prompt templates no longer embed `//` comments, which
+  models echoed back as invalid JSON; parsing is also more tolerant of
+  trailing commas in model output.
 
 ## [0.2.0] - 2026-06-25
 
