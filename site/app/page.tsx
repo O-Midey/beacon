@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CopyButton } from "@/components/CopyButton";
 import { RevealObserver } from "@/components/RevealObserver";
-import { RotatingWord } from "@/components/RotatingWord";
+import { FlipWord } from "@/components/FlipWord";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 
@@ -17,39 +17,54 @@ export default function LandingPage() {
         {/* HERO */}
         <section className="sec">
           <div className="wrap hero-inner">
-            <div className="sticker bob" style={{ top: 44, right: 150, rotate: "6deg", background: "var(--p)" }}>
-              MIT licensed
-            </div>
-            <div className="sticker bob-2" style={{ top: 110, right: 40, rotate: "-5deg", background: "var(--t)", color: "#fff" }}>
-              works offline
-            </div>
-            <svg className="star" width="70" height="70" viewBox="0 0 32 32" aria-hidden="true" style={{ top: 230, right: 80 }}>
-              <path d="M16 2 L19 12 L30 12 L21 18 L24 29 L16 22 L8 29 L11 18 L2 12 L13 12 Z" fill="#FFC900" stroke="#000" strokeWidth="1.6" />
-            </svg>
+            <div className="hero-grid">
+              <div className="hero-copy">
+                <h1 className="rise">
+                  You ship. Beacon drafts the{" "}
+                  <FlipWord
+                    words={[
+                      { w: "tweet", bg: "#FFC900", fg: "#000" },
+                      { w: "post", bg: "#FF90E8", fg: "#000" },
+                      { w: "article", bg: "#FFFFFF", fg: "#000" },
+                      { w: "skeet", bg: "#23A094", fg: "#fff" },
+                      { w: "toot", bg: "#FFC900", fg: "#000" },
+                    ]}
+                  />
+                  .
+                </h1>
+                <p className="lede rise" style={{ "--d": ".12s" } as React.CSSProperties}>
+                  Beacon watches your commits — scans them for secrets, scores what&apos;s worth
+                  telling, and drafts build-in-public posts for every platform you&apos;re on. Local,
+                  private, and never posted without you.
+                </p>
 
-            <h1 className="rise">
-              You ship. Beacon drafts{" "}
-              <RotatingWord
-                words={[
-                  "the tweet.",
-                  "the LinkedIn post.",
-                  "the dev.to article.",
-                  "the Bluesky post.",
-                  "the Mastodon toot.",
-                ]}
-              />
-            </h1>
-            <p className="lede rise" style={{ "--d": ".12s" } as React.CSSProperties}>
-              Beacon turns your git commits into build-in-public drafts — locally, privately, and never
-              posted without you. You review, you approve, you stay in control.
-            </p>
+                <div className="install-row rise" style={{ "--d": ".24s" } as React.CSSProperties}>
+                  <code className="cmd">{INSTALL}</code>
+                  <CopyButton text={INSTALL} className="cmd-copy" />
+                </div>
 
-            <div className="install-row rise" style={{ "--d": ".24s" } as React.CSSProperties}>
-              <code className="cmd">{INSTALL}</code>
-              <CopyButton text={INSTALL} className="cmd-copy" />
-            </div>
+                <div className="plat-row rise" style={{ "--d": ".32s" } as React.CSSProperties} aria-label="Supported platforms">
+                  <span className="plat-label">drafts for</span>
+                  <span className="chip">𝕏 / Twitter</span>
+                  <span className="chip">LinkedIn</span>
+                  <span className="chip">dev.to</span>
+                  <span className="chip">Bluesky</span>
+                  <span className="chip">Mastodon</span>
+                </div>
+              </div>
 
-            <div className="term rise" style={{ "--d": ".38s" } as React.CSSProperties}>
+              <div className="hero-side rise" style={{ "--d": ".38s" } as React.CSSProperties}>
+                <div className="sticker bob" style={{ top: -16, left: -14, rotate: "-6deg", background: "var(--p)", zIndex: 2 }}>
+                  MIT licensed
+                </div>
+                <div className="sticker bob-2" style={{ bottom: -16, right: -10, rotate: "4deg", background: "var(--t)", color: "#fff", zIndex: 2 }}>
+                  works offline
+                </div>
+                <svg className="star" width="70" height="70" viewBox="0 0 32 32" aria-hidden="true" style={{ top: -40, right: -16 }}>
+                  <path d="M16 2 L19 12 L30 12 L21 18 L24 29 L16 22 L8 29 L11 18 L2 12 L13 12 Z" fill="#FFC900" stroke="#000" strokeWidth="1.6" />
+                </svg>
+
+                <div className="term">
               <div className="termbar">
                 <span className="dot" style={{ background: "var(--p)" }} />
                 <span className="dot" style={{ background: "var(--y)" }} />
@@ -67,6 +82,8 @@ export default function LandingPage() {
                 <span className="tl" style={{ "--i": "4.4s" } as React.CSSProperties}>  <span className="c-y">3 drafts queued</span> → run <span className="c-p">beacon review</span> </span>
                 <span className="cursor" />
               </pre>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -74,8 +91,8 @@ export default function LandingPage() {
         {/* TICKER */}
         <div className="ticker" aria-hidden="true">
           <div className="ticker-track">
-            <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
-            <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+            <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+            <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
           </div>
         </div>
 

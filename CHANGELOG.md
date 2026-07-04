@@ -14,9 +14,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   file at build time.
 - **README demo GIF** (`assets/demo.gif`) — `beacon init` → commit →
   `beacon review`, recorded with vhs against a local mock model.
-- **Rotating hero headline** on the site — "Beacon drafts …" cycles through
-  all five platforms in a yellow sticker box; static under
-  `prefers-reduced-motion`.
+- **Site now matches the reworked mockup** — two-column hero with the
+  width-locked platform flip word (tweet/post/article/skeet/toot, per-platform
+  colors), platform chips row, main nav collapsing into a ☰ menu at ≤900px,
+  and the dedicated small-screen typography scale at ≤640px. Flip word is
+  static under `prefers-reduced-motion` and pauses on hidden tabs.
 
 ### Fixed
 
