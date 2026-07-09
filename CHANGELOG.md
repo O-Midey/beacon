@@ -6,8 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `beacon doctor` reported "Beacon looks healthy" and exited `0` even when the
+  live provider ping failed — an invalid API key passed the very check meant to
+  catch it. The ping result now joins the check list and drives the exit code.
+
 ### Changed
 
+- `beacon doctor` prints the base URL for every provider, not just `openai`,
+  and the network-error hint mentions `base-url` for both.
+- Provider endpoints are resolved from one table (`llm/endpoints.ts`) instead of
+  a default URL restated in each provider and again in `doctor`.
 - The Anthropic provider now calls the Messages API directly over `fetch`
   instead of going through `@anthropic-ai/sdk`. Beacon only ever makes a
   single-turn, non-streaming completion, so the SDK bought little and cost a

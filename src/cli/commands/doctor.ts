@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { c } from "../../lib/colors.js";
 import { hasApiKey, loadConfig } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
+import { DEFAULT_BASE_URL } from "../../lib/llm/endpoints.js";
 import { pingProvider } from "../../lib/llm/index.js";
 import { startSpinner } from "../../lib/spinner.js";
 import { isBeaconError, type BeaconConfig } from "../../types/index.js";
@@ -59,12 +60,10 @@ export function configChecks(config: BeaconConfig, keyPresent: boolean): Check[]
   });
   checks.push({ level: "ok", label: `Model: ${config.model}` });
 
-  if (config.provider === "openai") {
-    checks.push({
-      level: "ok",
-      label: `Base URL: ${config.baseUrl ?? "https://api.openai.com/v1 (default)"}`,
-    });
-  }
+  checks.push({
+    level: "ok",
+    label: `Base URL: ${config.baseUrl ?? `${DEFAULT_BASE_URL[config.provider]} (default)`}`,
+  });
 
   checks.push(
     keyPresent
@@ -149,21 +148,24 @@ export async function doctorCommand(): Promise<void> {
   ];
   for (const check of checks) print(check);
 
-  // Live ping only if a key is present.
+  // Live ping only if a key is present. Its result joins `checks` so a failed
+  // ping actually sinks the summary and the exit code.
   if (keyPresent) {
     const spinner = startSpinner(`Pinging ${config.provider}…`);
+    let ping: Check;
     try {
       await pingProvider(config);
-      spinner.stop();
-      print({ level: "ok", label: `${config.provider} responded to a test request` });
+      ping = { level: "ok", label: `${config.provider} responded to a test request` };
     } catch (err) {
-      spinner.stop();
-      print({
+      ping = {
         level: "fail",
         label: `${config.provider} ping failed`,
         hint: isBeaconError(err) ? err.message : String(err),
-      });
+      };
     }
+    spinner.stop();
+    checks.push(ping);
+    print(ping);
   }
 
   const failed = checks.some((ch) => ch.level === "fail");

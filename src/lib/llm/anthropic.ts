@@ -1,5 +1,6 @@
 import { BeaconError, type BeaconConfig } from "../../types/index.js";
 import { resolveApiKey } from "../config.js";
+import { resolveBaseUrl } from "./endpoints.js";
 import { classifyLlmError } from "./errors.js";
 import type { CompletionParams, LlmProvider } from "./types.js";
 
@@ -11,8 +12,6 @@ import type { CompletionParams, LlmProvider } from "./types.js";
  * `baseUrl` overrides the endpoint for proxies and gateways, mirroring the
  * OpenAI provider. It replaces the SDK's implicit `ANTHROPIC_BASE_URL` support.
  */
-
-const DEFAULT_BASE_URL = "https://api.anthropic.com/v1";
 
 /** Pinned per Anthropic's versioning policy; bump deliberately, not silently. */
 const API_VERSION = "2023-06-01";
@@ -35,7 +34,7 @@ export class AnthropicProvider implements LlmProvider {
     this.config = config;
     this.apiKey = resolveApiKey(config);
     this.model = config.model;
-    this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.baseUrl = resolveBaseUrl(config);
     this.fetchImpl = fetchImpl;
   }
 
