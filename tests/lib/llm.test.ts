@@ -101,3 +101,110 @@ describe("OpenAiProvider", () => {
     expect(fetchMock.mock.calls[0]![0]).toBe("https://api.example.com/v1/chat/completions");
   });
 });
+
+describe("AnthropicProvider", () => {
+  const okBody = (blocks: unknown) =>
+    new Response(JSON.stringify({ content: blocks }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+  it("builds a Messages-style body with system hoisted out of messages", () => {
+    const p = new AnthropicProvider(cfg({ model: "claude-opus-4-8" }));
+    const body = p.buildBody({ system: "sys", user: "usr", maxTokens: 100 });
+    expect(body).toMatchObject({
+      model: "claude-opus-4-8",
+      max_tokens: 100,
+      system: "sys",
+      messages: [{ role: "user", content: "usr" }],
+    });
+  });
+
+  it("posts to the Messages endpoint with the auth and version headers", async () => {
+    const fetchMock = vi.fn(async () => okBody([{ type: "text", text: "hello world" }]));
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+
+    const out = await p.complete({ system: "s", user: "u", maxTokens: 10 });
+
+    expect(out).toBe("hello world");
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("https://api.anthropic.com/v1/messages");
+    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).headers).toMatchObject({
+      "x-api-key": "test-key",
+      "anthropic-version": "2023-06-01",
+    });
+  });
+
+  it("honours a baseUrl override and strips its trailing slash", async () => {
+    const fetchMock = vi.fn(async () => okBody([{ type: "text", text: "ok" }]));
+    const p = new AnthropicProvider(
+      cfg({ baseUrl: "https://proxy.example.com/v1/", model: "x" }),
+      fetchMock as unknown as typeof fetch,
+    );
+    await p.complete({ system: "s", user: "u", maxTokens: 10 });
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://proxy.example.com/v1/messages");
+  });
+
+  it("concatenates text blocks and ignores non-text blocks", async () => {
+    const fetchMock = vi.fn(async () =>
+      okBody([
+        { type: "text", text: "part one " },
+        { type: "thinking", thinking: "ignored" },
+        { type: "text", text: "part two" },
+      ]),
+    );
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).resolves.toBe(
+      "part one part two",
+    );
+  });
+
+  it("returns an empty string when the response carries no content", async () => {
+    const fetchMock = vi.fn(async () => okBody(undefined));
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).resolves.toBe("");
+  });
+
+  it("throws AUTH_ERROR on a 401 status", async () => {
+    const fetchMock = vi.fn(async () => new Response("bad key", { status: 401 }));
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).rejects.toMatchObject({
+      code: "AUTH_ERROR",
+    });
+  });
+
+  it("throws MODEL_NOT_FOUND on a 404 status", async () => {
+    const fetchMock = vi.fn(async () => new Response("no model", { status: 404 }));
+    const p = new AnthropicProvider(cfg({ model: "nope" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).rejects.toMatchObject({
+      code: "MODEL_NOT_FOUND",
+    });
+  });
+
+  it("throws RATE_LIMITED on a 429 status", async () => {
+    const fetchMock = vi.fn(async () => new Response("slow down", { status: 429 }));
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+    });
+  });
+
+  it("throws NETWORK_ERROR when the transport fails outright", async () => {
+    const fetchMock = vi.fn(async () => {
+      throw new Error("fetch failed");
+    });
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
+    });
+  });
+
+  it("throws API_ERROR when a 200 body is not valid JSON", async () => {
+    const fetchMock = vi.fn(async () => new Response("<html>oops</html>", { status: 200 }));
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(p.complete({ system: "s", user: "u", maxTokens: 10 })).rejects.toMatchObject({
+      code: "API_ERROR",
+    });
+  });
+});

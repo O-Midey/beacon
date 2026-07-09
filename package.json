@@ -30,7 +30,10 @@
     "cli",
     "content",
     "git-hook",
-    "anthropic"
+    "llm",
+    "anthropic",
+    "openai",
+    "ollama"
   ],
   "author": "Mide (omotosho.xyz)",
   "license": "MIT",
@@ -43,7 +46,6 @@
     "url": "https://github.com/O-Midey/beacon/issues"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
     "@inquirer/prompts": "^7.2.1",
     "clipboardy": "^4.0.0",
     "commander": "^12.1.0",

@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The Anthropic provider now calls the Messages API directly over `fetch`
+  instead of going through `@anthropic-ai/sdk`. Beacon only ever makes a
+  single-turn, non-streaming completion, so the SDK bought little and cost a
+  lot: it was a mandatory dependency for every install (including the OpenAI
+  majority) and a static import parsed on every invocation.
+
+### Removed
+
+- `@anthropic-ai/sdk` runtime dependency — 9.8MB and two transitive packages
+  off every install. The LLM layer now has zero runtime dependencies.
+- `ANTHROPIC_BASE_URL` is no longer honoured for the `anthropic` provider; the
+  SDK read it implicitly, the `fetch` client does not. Set `baseUrl` in config
+  if you need to point at a proxy.
+
 ## [0.3.1] - 2026-07-04
 
 ### Added
