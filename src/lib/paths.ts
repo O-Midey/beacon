@@ -55,6 +55,11 @@ export function queueLockPath(): string {
   return join(beaconHome(), "queue.lock");
 }
 
+/** Where the pre-migration copy of a version-`n` queue is preserved. */
+export function queueBackupPath(fromVersion: number): string {
+  return join(beaconHome(), `queue.v${fromVersion}.bak.json`);
+}
+
 /** Runtime state of a live `beacon serve` (pid, port, session token). */
 export function serveStatePath(): string {
   return join(beaconHome(), "serve.json");

@@ -12,7 +12,15 @@ import {
   type WorkspaceSnapshot,
 } from "../types/index.js";
 import { withFileLock } from "../lib/lock.js";
-import { ensureBeaconHome, FILE_MODE, queueLockPath, queuePath, queueTmpPath } from "../lib/paths.js";
+import { CURRENT_QUEUE_VERSION, migrateQueue } from "./queue-migrations.js";
+import {
+  ensureBeaconHome,
+  FILE_MODE,
+  queueBackupPath,
+  queueLockPath,
+  queuePath,
+  queueTmpPath,
+} from "../lib/paths.js";
 
 /**
  * Stage 5 — Queue.
@@ -30,16 +38,28 @@ import { ensureBeaconHome, FILE_MODE, queueLockPath, queuePath, queueTmpPath } f
  */
 
 export const MAX_ENTRIES = 50;
-const EMPTY_QUEUE: Queue = { version: 1, entries: [] };
+const EMPTY_QUEUE: Queue = { version: CURRENT_QUEUE_VERSION, entries: [] };
 
-/** Load and validate the queue. A missing file yields an empty queue. */
+/**
+ * Load and validate the queue. A missing file yields an empty queue.
+ *
+ * The version is resolved *before* the schema is applied, so a queue written by
+ * an older Beacon is migrated rather than rejected, and one written by a newer
+ * Beacon says so rather than claiming the data is corrupt.
+ *
+ * A migration writes a backup of the original bytes but does not rewrite
+ * `queue.json` itself: loading is a read, and the next `saveQueue` — which runs
+ * under the queue lock — persists the new shape.
+ */
 export function loadQueue(): Queue {
   const path = queuePath();
   if (!existsSync(path)) return structuredClone(EMPTY_QUEUE);
 
+  const original = readFileSync(path, "utf8");
+
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, "utf8"));
+    raw = JSON.parse(original);
   } catch (err) {
     throw new BeaconError("Queue file is not valid JSON", "QUEUE_CORRUPT", {
       path,
@@ -47,7 +67,10 @@ export function loadQueue(): Queue {
     });
   }
 
-  const parsed = QueueSchema.safeParse(raw);
+  const { queue, migratedFrom } = migrateQueue(raw, path);
+  if (migratedFrom !== null) backupQueue(original, migratedFrom);
+
+  const parsed = QueueSchema.safeParse(queue);
   if (!parsed.success) {
     throw new BeaconError("Queue file failed validation", "QUEUE_CORRUPT", {
       path,
@@ -55,6 +78,22 @@ export function loadQueue(): Queue {
     });
   }
   return parsed.data;
+}
+
+/**
+ * Preserve the pre-migration bytes exactly once. Never overwrites an existing
+ * backup: the first copy is the one taken before anything touched the file, and
+ * that is the copy worth keeping.
+ *
+ * Exported for testing. `loadQueue` cannot exercise this end-to-end until a
+ * real migration exists, because `QueueSchema` validates the *current* shape
+ * and would reject a synthetic future one immediately after migrating it.
+ */
+export function backupQueue(original: string, fromVersion: number): void {
+  const backup = queueBackupPath(fromVersion);
+  if (existsSync(backup)) return;
+  ensureBeaconHome();
+  writeFileSync(backup, original, { encoding: "utf8", mode: FILE_MODE });
 }
 
 /** Atomically write the queue to disk, owner-readable only. */
@@ -136,7 +175,7 @@ export function buildEntry(input: {
 /** Prepend an entry (newest-first) and enforce the cap. Pure. */
 export function addEntry(queue: Queue, entry: QueueEntry): Queue {
   return {
-    version: 1,
+    version: CURRENT_QUEUE_VERSION,
     entries: enforceCap([entry, ...queue.entries]),
   };
 }
@@ -184,13 +223,13 @@ export function setEntryStatus(
       ? { ...e, status, ...(status === "pending" ? {} : { reviewedAt }) }
       : e,
   );
-  return { version: 1, entries };
+  return { version: CURRENT_QUEUE_VERSION, entries };
 }
 
 /** Replace an entry's draftSet (used after an in-place edit). Pure. */
 export function updateDraftSet(queue: Queue, id: string, draftSet: DraftSet): Queue {
   const entries = queue.entries.map((e) => (e.id === id ? { ...e, draftSet } : e));
-  return { version: 1, entries };
+  return { version: CURRENT_QUEUE_VERSION, entries };
 }
 
 /** Convenience selector. */
