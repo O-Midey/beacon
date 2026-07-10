@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { logger } from "../../lib/logger.js";
 import { BeaconError } from "../../types/index.js";
 
@@ -34,6 +34,12 @@ function resolveHooksDir(): string {
   }
 }
 
+/** Prefer `.git/hooks/post-commit` over a long absolute path when inside the repo. */
+function displayPath(p: string): string {
+  const rel = relative(process.cwd(), p);
+  return rel && !rel.startsWith("..") ? rel : p;
+}
+
 export function installCommand(): void {
   const hooksDir = resolveHooksDir();
   if (!existsSync(hooksDir)) {
@@ -44,13 +50,13 @@ export function installCommand(): void {
   if (!existsSync(hookPath)) {
     writeFileSync(hookPath, `${SHEBANG}\n\n${HOOK_SNIPPET}\n`, { mode: 0o755 });
     chmodSync(hookPath, 0o755);
-    logger.success(`Installed Beacon post-commit hook at ${hookPath}`);
+    logger.success(`Installed Beacon post-commit hook at ${displayPath(hookPath)}`);
     return;
   }
 
   const existing = readFileSync(hookPath, "utf8");
   if (existing.includes(MARKER)) {
-    logger.info(`Beacon hook already present in ${hookPath} — nothing to do.`);
+    logger.info(`Beacon hook already present in ${displayPath(hookPath)} — nothing to do.`);
     return;
   }
 
@@ -59,5 +65,5 @@ export function installCommand(): void {
   const separator = existing.endsWith("\n") ? "\n" : "\n\n";
   writeFileSync(hookPath, `${prefix}${existing}${separator}${HOOK_SNIPPET}\n`);
   chmodSync(hookPath, 0o755);
-  logger.success(`Appended Beacon hook to existing post-commit at ${hookPath}`);
+  logger.success(`Appended Beacon hook to existing post-commit at ${displayPath(hookPath)}`);
 }
