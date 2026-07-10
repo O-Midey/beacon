@@ -2,11 +2,11 @@ export const metadata = { title: "Commands" };
 
 # Commands
 
-Eight commands. You'll mostly use two.
+Nine commands. You'll mostly use two.
 
 ## beacon init
 
-Guided setup: provider, API key, voice, and language. Installs the post-commit hook, and drafts from your latest commit before setup even finishes.
+Guided setup. Asks only for the essentials — provider and API key — and defaults the rest; voice and language are one optional step. Picking Ollama auto-detects the running daemon and lists your pulled models. Installs the post-commit hook, and drafts from your latest commit before setup even finishes.
 
 ```bash
 beacon init
@@ -53,6 +53,8 @@ the draft appears in the open tab.
 beacon ui
 ```
 
+![beacon ui: inline-editing a tweet thread, a new commit's draft arriving live, then copy and approve](https://raw.githubusercontent.com/O-Midey/beacon/main/assets/ui-demo.gif)
+
 The page is served from `127.0.0.1` only and every data request carries a
 per-session token, so nothing on the network — and no other website in your
 browser — can reach your drafts. The terminal and the browser share one queue;
@@ -75,6 +77,17 @@ Set any config key. See [Configuration](/docs/configuration) for the full list.
 ```bash
 beacon config set significance-threshold 5
 beacon config set platform bluesky on
+```
+
+## beacon config show
+
+The effective config as an aligned key/value view — including which API key is
+in effect and whether an env var is overriding the stored one. `--json` prints
+the raw (masked) config for scripts.
+
+```bash
+beacon config show
+beacon config show --json
 ```
 
 ## beacon doctor

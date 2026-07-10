@@ -26,7 +26,7 @@ npm install -g beacon-bip
 beacon init
 ```
 
-`beacon init` walks you through provider, key, voice, and language, installs the git hook, and drafts from your latest commit — you see real output before setup ends. Then just commit as usual.
+`beacon init` asks for the essentials — provider and key — and defaults the rest (voice and language are one optional step you can skip and set later). It installs the git hook and drafts from your latest commit, so you see real output before setup ends. Then just commit as usual.
 
 ```bash
 beacon review   # review, edit, approve or discard pending drafts — in the terminal
@@ -40,7 +40,7 @@ Beacon works fully offline with [Ollama](https://ollama.com) — pick **Ollama**
 
 ```bash
 ollama pull llama3.1
-beacon init     # choose "Ollama (local model — free, fully offline)"
+beacon init     # choose "Ollama" — Beacon detects it and lists your models
 ```
 
 Privacy-first product, privacy-first model: with Ollama your diff never leaves your machine at all.
@@ -105,6 +105,10 @@ beacon draft --since "3 days ago"    # anything `git log --since` accepts
 
 # Health check: node, git, config, hook, PATH, live provider ping
 beacon doctor
+
+# Show the effective config — annotates when an env var overrides the
+# stored key. `--json` prints the raw (masked) config for scripts.
+beacon config show
 ```
 
 In `beacon review`, each pending entry shows its significance score and every drafted platform, then offers:
@@ -119,6 +123,8 @@ In `beacon review`, each pending entry shows its significance score and every dr
 ```bash
 beacon ui
 ```
+
+![beacon ui: inline-editing a tweet thread, a new commit's draft arriving live over SSE, then copy and approve](https://raw.githubusercontent.com/O-Midey/beacon/main/assets/ui-demo.gif)
 
 `beacon ui` opens the same queue as a local web page: platform drafts side by
 side, inline editing, copy-to-clipboard, live updates as new commits draft in

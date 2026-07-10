@@ -1,0 +1,9 @@
+{
+  "name": "beacon-demo-rig",
+  "private": true,
+  "description": "Recording rig for the README demo GIFs — never published.",
+  "type": "module",
+  "dependencies": {
+    "playwright-core": "^1.49.0"
+  }
+}

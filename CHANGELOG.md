@@ -37,6 +37,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   actions are pinned by commit SHA.
 - **[`SECURITY.md`](SECURITY.md)** — a written threat model: what leaves your
   machine, what never does, and what the scanner does not protect against.
+- **Ollama auto-detection in `beacon init`** — picking Ollama now finds the
+  running daemon and offers your pulled models as a picker, instead of asking
+  you to type a base URL and a model name from memory.
+- **`beacon config show` is readable** — an aligned key/value view that says
+  which API key is actually in effect (and when an env var overrides the
+  stored one). The old raw-JSON output is still there behind `--json`.
+
+### Changed
+
+- **`beacon init` asks less** — setup now needs only the essentials (provider
+  and key); bio, voice notes, and language sit behind a single optional
+  "personalize now?" step, and the significance-threshold question is gone
+  (it defaults to 6 — tune it any time with
+  `beacon config set significance-threshold`). A failed connection test now
+  offers to re-enter the key or retry instead of marching on with a broken
+  setup.
+- **A branded terminal** — Beacon's yellow now runs through the whole CLI:
+  a `✦ beacon` wordmark opens each command, prompts render as one connected
+  flow, and `beacon review` shows each draft as a card with per-platform
+  character counts (flagged when a tweet runs past 280).
 
 ### Fixed
 
@@ -50,6 +70,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **A queue from a newer Beacon reported as corrupt.** `queue.json` is now
   versioned: an older file is migrated (after its bytes are copied aside), and
   a newer one prompts you to upgrade rather than implying data loss.
+- **Re-running `beacon init` after switching providers suggested the old
+  provider's model.** Choosing Anthropic on a machine previously set up for
+  OpenAI offered `gpt-4o-mini` as the default; the suggested model now follows
+  the provider you just picked.
+- **Piping output could crash.** `beacon config show | head` (or any early-
+  closing reader) died with an unhandled `EPIPE` stack trace; a closed pipe now
+  ends the process quietly.
 
 ### Security
 
