@@ -28,9 +28,14 @@ Fixes land on the latest minor. There are no backports.
 
 ## What leaves your machine
 
-Beacon makes network requests to exactly one destination: **the LLM provider
-endpoint you configured**. Nothing else. There is no telemetry, no analytics, no
-crash reporting, no update ping, and no server operated by this project.
+Beacon makes outbound network requests to exactly one destination: **the LLM
+provider endpoint you configured**. Nothing else. There is no telemetry, no
+analytics, no crash reporting, no update ping, and no server operated by this
+project that your data is sent to.
+
+`beacon serve` and `beacon ui` do start a server, but a purely local one — see
+[The local review server](#the-local-review-server). It never makes an outbound
+request and nothing reaches it except your own browser.
 
 A commit that passes the safety and significance gates costs two HTTPS requests
 to that endpoint:
@@ -69,6 +74,29 @@ recommended configuration if you work on code you cannot send to a third party.
 Beacon never publishes. Approving a draft copies it to your clipboard. Every
 post is one you paste and send yourself.
 
+## The local review server
+
+`beacon serve` exposes the review queue over HTTP so `beacon ui` can render it
+in your browser. It makes no outbound requests and speaks only to you.
+
+**Binding to loopback is not an authentication boundary.** Any web page you
+visit can issue requests to `127.0.0.1`, and DNS rebinding defeats a check on
+the address alone. So the server defends in three layers:
+
+1. It listens on `127.0.0.1` only, never on a routable interface.
+2. It rejects any request whose `Host` header falls outside an allowlist, which
+   is what actually stops DNS rebinding — a rebound name still sends
+   `Host: evil.example.com`.
+3. Every data route sits behind a session token, minted per `beacon serve`
+   process and compared in constant time.
+
+The token is handed to the browser out-of-band, through stdout and an
+owner-only `~/.beacon/serve.json`, and travels in the URL *fragment* — so it is
+never sent in a request line and never lands in a log. UI assets are served
+without a token, deliberately: a browser navigation cannot carry an
+`Authorization` header, and the assets are not your data. Everything that reads
+or mutates the queue is behind the token.
+
 ## Trust boundaries
 
 **Repository content is untrusted for secrets.** The diff and the commit message
@@ -77,13 +105,23 @@ finding aborts drafting for that commit entirely. A `warning` finding is
 redacted and drafting continues. After the safety stage the pipeline holds only
 a redacted snapshot; no later stage has a reference to the raw capture.
 
+**A repository's `.beacon.json` is untrusted input.** It arrives by `git clone`,
+from a stranger. It does nothing until `beacon trust` approves it, which pins
+the file's SHA-256; editing the file — or merging a pull request that edits it —
+lapses that approval and Beacon warns rather than silently applying the change.
+Even once trusted, a repository may never set `apiKey`, `baseUrl`, `provider`,
+or `model`. A repository may influence **whether and what** gets drafted; only
+you decide **who you are, where the bytes go, and with what credential.**
+
 **Model output is untrusted.** Drafts are parsed and validated against a Zod
 schema before they are persisted. They are never executed, never interpolated
 into a shell command, and never published automatically.
 
 **Local state is validated, not assumed.** `config.json` and `queue.json` are
 schema-validated on load; a malformed file raises an error rather than being
-silently coerced.
+silently coerced. A queue written by a newer Beacon is refused with an upgrade
+prompt rather than treated as corrupt, and an older one is migrated after its
+original bytes are copied aside.
 
 ## Data at rest
 
@@ -94,6 +132,9 @@ Everything lives under `~/.beacon`, which is created `0700` and repaired to
 | --- | --- | --- |
 | `config.json` | `0600` | Your API key, unless it comes from the environment |
 | `queue.json` | `0600` | Redacted snapshots, drafts, safety findings (max 50 entries) |
+| `queue.v<n>.bak.json` | `0600` | The pre-migration copy of an older queue |
+| `trusted.json` | `0600` | Repo root → SHA-256 of the `.beacon.json` you approved |
+| `serve.json` | `0600` | The running `beacon serve` pid, port, and session token |
 | `beacon.log` | `0600` | Commit messages and error context |
 
 Beacon does not encrypt these files. Their protection is filesystem permissions

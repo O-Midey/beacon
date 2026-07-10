@@ -15,7 +15,7 @@ Beacon installs a `post-commit` git hook that reads your diff and commit message
 
 **Nothing is ever published automatically.** You always review, edit, approve, or discard before anything leaves your machine.
 
-There is no server, no database, and no cloud sync. Two JSON files under `~/.beacon/`, one CLI.
+No remote server, no database, no cloud sync — JSON files under `~/.beacon/` and one CLI. (`beacon ui` starts a review server, but it is loopback-only, token-authenticated, and never talks to the internet.)
 
 ---
 
@@ -182,6 +182,40 @@ All config lives in `~/.beacon/config.json` (mode `0600`).
 | `platforms`             | see notes           | `twitter` / `linkedin` / `devto` on, `bluesky` / `mastodon` off. Toggle each with `beacon config set platform <name> <on\|off>`. |
 | `model`                 | `claude-sonnet-4-6` | Model ID for the active provider.                                                                                                |
 | `maxDiffChars`          | `8000`              | Diff truncation limit before LLM calls.                                                                                          |
+| `enabled`               | `true`              | When false, the hook is a no-op: no LLM call, no draft, no spend.                                                                |
+
+### Per-repository config
+
+Different repos deserve different voices — and some deserve none. Drop a
+`.beacon.json` at a repo root to override the global config for that repo alone:
+
+```jsonc
+{
+  "enabled": false,                       // never draft from this repo
+  "language": "French",
+  "significanceThreshold": 8,             // only the big stuff
+  "authorNotes": "never name the client",
+  "platforms": { "twitter": false }       // merges per-key with your global toggles
+}
+```
+
+**It does nothing until you trust it.** A `.beacon.json` arrives by `git clone`,
+from a stranger, so Beacon ignores it — and says so in `beacon doctor` — until
+you approve it:
+
+```bash
+beacon trust            # shows exactly what it would change, then asks
+beacon trust --revoke   # forget this repo's approval
+```
+
+Approving pins the file's SHA-256. Edit it, or merge a PR that edits it, and the
+approval lapses automatically — you get warned rather than silently getting
+someone else's settings.
+
+A repo config may only set the keys above. It may **never** set `apiKey`,
+`baseUrl`, `provider`, or `model`; those are refused by name. A repository can
+influence whether and what gets drafted. Only you decide who you are, where the
+bytes go, and with what credential.
 
 ---
 
@@ -214,11 +248,15 @@ hooks/         post-commit template
 
 ## Security
 
-- The safety scanner always runs **before** any LLM call — the model never sees the raw diff.
-- A critical finding (e.g. a leaked `sk-ant-…` key) aborts drafting and logs which lines triggered it.
-- API keys live only on your machine — env var or a `0600` config file, never in code.
+- The safety scanner always runs **before** any LLM call, over **both the diff and the commit message** — the model never sees a raw secret from either.
+- A critical finding (e.g. a leaked `sk-ant-…` key) aborts drafting and logs which surface and line triggered it.
+- API keys live only on your machine — env var or a `0600` config file, never in code. Everything under `~/.beacon/` is `0600`, in a `0700` directory.
+- A repo's `.beacon.json` is untrusted until `beacon trust` approves it, and can never set your provider, model, key, or base URL.
 - The `beacon ui` server is loopback-only and token-authenticated per session; the web page ships a strict self-only Content-Security-Policy, so nothing it renders can call out.
 - Concurrent writers (the git hook, `beacon review`, `beacon ui`) serialize queue writes through a cross-process file lock — no lost drafts, no corrupt queue.
+- Releases are published to npm with [provenance](https://docs.npmjs.com/generating-provenance-statements), tying the published package to the exact commit and CI run that built it.
+
+For the full threat model — what leaves your machine, what never does, and what the scanner explicitly does **not** protect against — see [SECURITY.md](SECURITY.md).
 
 ---
 

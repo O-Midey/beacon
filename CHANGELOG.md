@@ -22,6 +22,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`~/.beacon/queue.lock`), so concurrent writers can no longer lose each
   other's updates. Stale locks from crashed processes are detected and
   reclaimed automatically.
+- **Per-repository config** — a `.beacon.json` at a repo root overrides the
+  global config for that repo (`enabled`, `platforms`, `significanceThreshold`,
+  `language`, `authorNotes`). It is ignored until you approve it with
+  **`beacon trust`**, which pins the file's SHA-256; editing the file lapses
+  that approval automatically. A repo config may never set `apiKey`, `baseUrl`,
+  `provider`, or `model`.
+- **`enabled: false`** — opt a repository out entirely. The hook becomes a
+  no-op ahead of any API call, so an opted-out repo costs nothing.
+- **`beacon doctor`** now reports which config layers are in effect and warns
+  when a `.beacon.json` is present but untrusted.
+- **npm provenance** — releases are published with a signed provenance
+  attestation linking the package to the commit and CI run that built it. CI
+  actions are pinned by commit SHA.
+- **[`SECURITY.md`](SECURITY.md)** — a written threat model: what leaves your
+  machine, what never does, and what the scanner does not protect against.
+
+### Fixed
+
+- **Secrets in the commit message reached the model.** The scanner only ever
+  saw the diff, while the commit message was sent verbatim to both LLM calls —
+  so `git commit -m "rotate sk-ant-…"` shipped the key to the provider. Both
+  surfaces are now scanned before either call.
+- **The repository was named after the working directory.** A commit from a
+  subdirectory told the model (and the drafted post) that the repo was called
+  `src`, or `pipeline`; it now uses the repository root.
+- **A queue from a newer Beacon reported as corrupt.** `queue.json` is now
+  versioned: an older file is migrated (after its bytes are copied aside), and
+  a newer one prompts you to upgrade rather than implying data loss.
+
+### Security
+
+- **`queue.json` was world-readable and stored the raw diff.** A `warning`-level
+  finding (an `.env` assignment, a private IP) is redacted from the model but
+  does not block drafting, so the raw secret was written to a `0644` file.
+  `queue.json` is now `0600` and stores only the redacted snapshot; `~/.beacon`
+  and every file under it are owner-only, repaired on write.
 
 ## [0.4.0] - 2026-07-10
 
