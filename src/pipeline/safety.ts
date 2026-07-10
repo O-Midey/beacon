@@ -1,4 +1,9 @@
-import type { SafetyFinding, SafetyScanResult, SafetySeverity } from "../types/index.js";
+import type {
+  SafetyFinding,
+  SafetyFindingSource,
+  SafetyScanResult,
+  SafetySeverity,
+} from "../types/index.js";
 
 /**
  * Stage 3 — Safety Scanner.
@@ -146,29 +151,68 @@ export function scanLine(content: string): LineScan {
   return { redactedContent: redacted, findings };
 }
 
+/** Plain text carries no diff markers; every character is content. */
+function splitPlainLine(line: string): { prefix: string; content: string } {
+  return { prefix: "", content: line };
+}
+
+/**
+ * Scan `text` line by line, tagging each finding with the surface it came from.
+ * Shared by the diff and commit-message scans so a rule can never apply to one
+ * and silently not the other.
+ */
+function scanLines(
+  text: string,
+  source: SafetyFindingSource,
+  split: (line: string) => { prefix: string; content: string },
+): { redacted: string; findings: SafetyFinding[] } {
+  const findings: SafetyFinding[] = [];
+  const redactedLines: string[] = [];
+
+  text.split("\n").forEach((line, idx) => {
+    const { prefix, content } = split(line);
+    const { redactedContent, findings: lineFindings } = scanLine(content);
+    for (const f of lineFindings) {
+      findings.push({ pattern: f.pattern, line: idx + 1, severity: f.severity, source });
+    }
+    redactedLines.push(prefix + redactedContent);
+  });
+
+  return { redacted: redactedLines.join("\n"), findings };
+}
+
+const isSafe = (findings: readonly SafetyFinding[]): boolean =>
+  !findings.some((f) => f.severity === "critical");
+
 /**
  * Scan a full unified diff. Returns findings with 1-based line numbers, a fully
  * redacted copy of the diff, and a `safe` flag (false iff any critical finding).
  */
 export function scanDiff(diff: string): SafetyScanResult {
-  const lines = diff.split("\n");
-  const findings: SafetyFinding[] = [];
-  const redactedLines: string[] = [];
+  const { redacted, findings } = scanLines(diff, "diff", splitDiffLine);
+  return { safe: isSafe(findings), redactedDiff: redacted, findings };
+}
 
-  lines.forEach((line, idx) => {
-    const { prefix, content } = splitDiffLine(line);
-    const { redactedContent, findings: lineFindings } = scanLine(content);
-    for (const f of lineFindings) {
-      findings.push({ pattern: f.pattern, line: idx + 1, severity: f.severity });
-    }
-    redactedLines.push(prefix + redactedContent);
-  });
-
-  const safe = !findings.some((f) => f.severity === "critical");
+/**
+ * Scan every surface the LLM will see: the diff AND the commit message.
+ *
+ * The message is not incidental — it is sent verbatim to both the significance
+ * filter and the drafter, so a key pasted into `git commit -m` (or supplied via
+ * `beacon draft --message`) would otherwise reach the provider untouched while
+ * the diff beside it was carefully redacted.
+ */
+export function scanSnapshot(snapshot: {
+  diff: string;
+  commitMessage: string;
+}): SafetyScanResult {
+  const diff = scanLines(snapshot.diff, "diff", splitDiffLine);
+  const message = scanLines(snapshot.commitMessage, "commit-message", splitPlainLine);
+  const findings = [...diff.findings, ...message.findings];
 
   return {
-    safe,
-    redactedDiff: redactedLines.join("\n"),
+    safe: isSafe(findings),
+    redactedDiff: diff.redacted,
+    redactedCommitMessage: message.redacted,
     findings,
   };
 }

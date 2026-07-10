@@ -68,9 +68,9 @@ capture → safety → significance → draft → queue
 | Stage | What it does |
 | --- | --- |
 | **Capture** | Reads the commit (or commit range) diff, message, and changed-file stats into a typed snapshot. Diff is truncated for cost control. |
-| **Safety** | Regex-only scan (no LLM) for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. Runs before *any* LLM call. **Critical findings block drafting; warnings are redacted.** |
-| **Significance** | An LLM call scores the commit 0–10 (on the redacted diff). Routine changes fall below the threshold (default: 6) and are skipped. |
-| **Draft** | A single LLM call produces drafts for every **enabled** platform, in your voice and language, receiving only the redacted diff. |
+| **Safety** | Regex-only scan (no LLM) of **the diff and the commit message** — both reach the model — for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. Runs before *any* LLM call. **Critical findings block drafting; warnings are redacted.** Every later stage receives only the redacted snapshot. |
+| **Significance** | An LLM call scores the commit 0–10 (on the redacted snapshot). Routine changes fall below the threshold (default: 6) and are skipped. |
+| **Draft** | A single LLM call produces drafts for every **enabled** platform, in your voice and language, receiving only the redacted snapshot. |
 | **Queue** | Drafts are persisted atomically to `~/.beacon/queue.json` (capped at 50 entries) for `beacon review`. |
 
 ---

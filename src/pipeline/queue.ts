@@ -93,16 +93,26 @@ export function enforceCap(entries: QueueEntry[], max: number = MAX_ENTRIES): Qu
 }
 
 /**
- * Swap the raw diff for the redacted one before persistence. Pure.
+ * Replace every LLM- and disk-visible field with its redacted counterpart.
+ * Pure, and idempotent: re-applying it to an already-redacted snapshot is a
+ * no-op, which is what lets the pipeline redact once up front and the queue
+ * writer re-assert it as defence in depth.
  *
- * This is the only place a snapshot crosses from memory to disk, so it is the
- * only place the substitution has to happen.
+ * `redactedCommitMessage` is absent on results produced before message
+ * scanning existed; leaving the message untouched then is correct, because it
+ * was never scanned rather than scanned-and-found-clean.
  */
 export function redactSnapshot(
   snapshot: WorkspaceSnapshot,
   safety: SafetyScanResult,
 ): WorkspaceSnapshot {
-  return { ...snapshot, diff: safety.redactedDiff };
+  return {
+    ...snapshot,
+    diff: safety.redactedDiff,
+    ...(safety.redactedCommitMessage !== undefined
+      ? { commitMessage: safety.redactedCommitMessage }
+      : {}),
+  };
 }
 
 /** Build a fresh pending QueueEntry. Pure; takes all stage outputs. */

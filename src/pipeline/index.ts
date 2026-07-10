@@ -1,8 +1,8 @@
 import type { BeaconConfig, SafetyScanResult, SignificanceResult, WorkspaceSnapshot } from "../types/index.js";
 import { capture } from "./capture.js";
 import { draft } from "./drafter.js";
-import { enqueue } from "./queue.js";
-import { scanDiff } from "./safety.js";
+import { enqueue, redactSnapshot } from "./queue.js";
+import { scanSnapshot } from "./safety.js";
 import { assessSignificance, meetsThreshold } from "./significance.js";
 
 /**
@@ -53,27 +53,34 @@ export async function runPipeline(
   stage("capture");
   const snapshot = options.snapshot ?? capture(config);
 
-  // Stage 2 — Safety (before ANY LLM call)
+  // Stage 2 — Safety (before ANY LLM call). Scans every surface the model will
+  // see: the diff and the commit message.
   stage("safety");
-  const safety = scanDiff(snapshot.diff);
+  const safety = scanSnapshot(snapshot);
+
+  // From here on the raw snapshot is dead. Everything downstream — both LLM
+  // calls, the queue writer — receives only this redacted copy, so a stage
+  // cannot reach a secret by reading a field nobody thought to redact.
+  const safeSnapshot = redactSnapshot(snapshot, safety);
+
   if (!safety.safe) {
-    return { kind: "blocked_unsafe", snapshot, safety };
+    return { kind: "blocked_unsafe", snapshot: safeSnapshot, safety };
   }
 
-  // Stage 3 — Significance (receives the redacted diff, never the raw one)
+  // Stage 3 — Significance
   stage("significance");
-  const significance = await assessSignificance(snapshot, safety.redactedDiff, config);
+  const significance = await assessSignificance(safeSnapshot, safety.redactedDiff, config);
   if (!options.force && !meetsThreshold(significance, config)) {
-    return { kind: "not_significant", snapshot, significance };
+    return { kind: "not_significant", snapshot: safeSnapshot, significance };
   }
 
-  // Stage 4 — Draft (also receives the redacted diff via `safety`)
+  // Stage 4 — Draft
   stage("draft");
-  const draftSet = await draft(snapshot, significance, safety, config);
+  const draftSet = await draft(safeSnapshot, significance, safety, config);
 
   // Stage 5 — Queue
   stage("queue");
-  const entryId = await enqueue({ draftSet, snapshot, significance, safety });
+  const entryId = await enqueue({ draftSet, snapshot: safeSnapshot, significance, safety });
 
-  return { kind: "queued", entryId, snapshot, significance, safety };
+  return { kind: "queued", entryId, snapshot: safeSnapshot, significance, safety };
 }

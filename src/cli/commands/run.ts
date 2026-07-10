@@ -53,7 +53,7 @@ export async function runCommand(options: RunOptions = {}): Promise<void> {
       }
       case "blocked_unsafe": {
         const criticals = outcome.safety.findings.filter((f) => f.severity === "critical");
-        const detail = criticals.map((f) => `${f.pattern} @ diff line ${f.line}`).join(", ");
+        const detail = criticals.map((f) => `${f.pattern} @ ${f.source} line ${f.line}`).join(", ");
         const msg = `Beacon: drafting blocked — critical safety findings: ${detail}`;
         logger.file("error", msg);
         spinner?.fail(c.error(msg));

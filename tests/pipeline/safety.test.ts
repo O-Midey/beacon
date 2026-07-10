@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SAFETY_RULES, scanDiff, scanLine } from "../../src/pipeline/safety.js";
+import { SAFETY_RULES, scanDiff, scanLine, scanSnapshot } from "../../src/pipeline/safety.js";
 
 /**
  * Every safety rule gets at least one true-positive and one true-negative.
@@ -153,5 +153,88 @@ describe("rule set integrity", () => {
       const b = rule.build();
       expect(a).not.toBe(b);
     }
+  });
+});
+
+/* --------------------------- commit-message scan -------------------------- */
+
+/**
+ * The commit message is sent verbatim to both the significance filter and the
+ * drafter. It used to bypass the scanner entirely, so a key pasted into
+ * `git commit -m` reached the provider while the diff beside it was redacted.
+ */
+describe("scanSnapshot: the commit message is an LLM-visible surface", () => {
+  const cleanDiff = "+const x = 1;";
+
+  it("blocks a critical secret found only in the commit message", () => {
+    const result = scanSnapshot({
+      diff: cleanDiff,
+      commitMessage: "chore: rotate sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFF",
+    });
+
+    expect(result.safe).toBe(false);
+    const finding = result.findings.find((f) => f.severity === "critical");
+    expect(finding?.source).toBe("commit-message");
+    expect(finding?.pattern).toBe("anthropic-or-openai-key");
+  });
+
+  it("redacts the secret out of the message it hands downstream", () => {
+    const result = scanSnapshot({
+      diff: cleanDiff,
+      commitMessage: "chore: rotate sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFF",
+    });
+
+    expect(result.redactedCommitMessage).not.toContain("sk-ant-api03");
+    expect(result.redactedCommitMessage).toContain("[REDACTED]");
+  });
+
+  it("redacts a warning in the message without blocking the draft", () => {
+    const result = scanSnapshot({
+      diff: cleanDiff,
+      commitMessage: "deploy: point at 10.0.0.42",
+    });
+
+    expect(result.safe).toBe(true); // warnings never block
+    expect(result.redactedCommitMessage).not.toContain("10.0.0.42");
+    expect(result.findings.every((f) => f.source === "commit-message")).toBe(true);
+  });
+
+  it("tags findings with the surface they came from", () => {
+    const result = scanSnapshot({
+      diff: "+const token = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc';",
+      commitMessage: "fix: connect to postgres://user:pw@db.internal:5432/app",
+    });
+
+    const sources = result.findings.map((f) => f.source);
+    expect(sources).toContain("diff");
+    expect(sources).toContain("commit-message");
+    expect(result.safe).toBe(false);
+  });
+
+  it("numbers message findings by their line within the message", () => {
+    const result = scanSnapshot({
+      diff: cleanDiff,
+      commitMessage: "feat: add auth\n\nOld key was sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFF",
+    });
+
+    const finding = result.findings.find((f) => f.source === "commit-message");
+    expect(finding?.line).toBe(3);
+  });
+
+  it("leaves a clean snapshot untouched", () => {
+    const result = scanSnapshot({ diff: cleanDiff, commitMessage: "feat: add a thing" });
+
+    expect(result.safe).toBe(true);
+    expect(result.findings).toHaveLength(0);
+    expect(result.redactedDiff).toBe(cleanDiff);
+    expect(result.redactedCommitMessage).toBe("feat: add a thing");
+  });
+});
+
+describe("scanDiff still tags its findings as diff findings", () => {
+  it("sets source=diff", () => {
+    const result = scanDiff("+const k = 'sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFF';");
+    expect(result.findings.every((f) => f.source === "diff")).toBe(true);
+    expect(result.redactedCommitMessage).toBeUndefined();
   });
 });

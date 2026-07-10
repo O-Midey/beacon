@@ -67,7 +67,7 @@ export const WorkspaceSnapshotSchema = z.object({
 export type WorkspaceSnapshot = z.infer<typeof WorkspaceSnapshotSchema>;
 
 /* -------------------------------------------------------------------------- */
-/*  Stage 2 — Significance                                                    */
+/*  Stage 3 — Significance                                                    */
 /* -------------------------------------------------------------------------- */
 
 export const SignificanceResultSchema = z.object({
@@ -79,21 +79,35 @@ export const SignificanceResultSchema = z.object({
 export type SignificanceResult = z.infer<typeof SignificanceResultSchema>;
 
 /* -------------------------------------------------------------------------- */
-/*  Stage 3 — Safety                                                          */
+/*  Stage 2 — Safety                                                          */
 /* -------------------------------------------------------------------------- */
 
 export type SafetySeverity = "critical" | "warning";
+
+/**
+ * Which LLM-visible surface a finding came from. `line` is 1-based within that
+ * surface, so reporting it without the source would be misleading.
+ */
+export const SafetyFindingSourceSchema = z.enum(["diff", "commit-message"]).default("diff");
+export type SafetyFindingSource = z.infer<typeof SafetyFindingSourceSchema>;
 
 export const SafetyFindingSchema = z.object({
   pattern: z.string(),
   line: z.number().int().nonnegative(),
   severity: z.enum(["critical", "warning"]),
+  /** Defaulted so queue entries written before message-scanning still parse. */
+  source: SafetyFindingSourceSchema,
 });
 export type SafetyFinding = z.infer<typeof SafetyFindingSchema>;
 
 export const SafetyScanResultSchema = z.object({
   safe: z.boolean(),
   redactedDiff: z.string(),
+  /**
+   * Optional so queue entries written before message-scanning still parse.
+   * Absent means the message was never scanned, not that it was empty.
+   */
+  redactedCommitMessage: z.string().optional(),
   findings: z.array(SafetyFindingSchema),
 });
 export type SafetyScanResult = z.infer<typeof SafetyScanResultSchema>;
