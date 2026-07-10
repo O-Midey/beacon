@@ -1,3 +1,4 @@
+import { basename } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildDigestMessage,
@@ -7,6 +8,7 @@ import {
   parseHashList,
   parseLog,
   parseNumstat,
+  repoRoot,
   truncateDiff,
 } from "../../src/lib/git.js";
 
@@ -193,5 +195,69 @@ describe("getRangeSnapshot (injected runner)", () => {
       throw new Error(`unexpected git call: ${key}`);
     };
     expect(() => getRangeSnapshot("1 week ago", 8000, run)).toThrowError(/no commits found/i);
+  });
+});
+
+/* -------------------------------- repo root ------------------------------- */
+
+/**
+ * `repoName` is sent to the model and lands in the published post. Deriving it
+ * from `process.cwd()` meant a hook fired from `src/pipeline/` announced the
+ * repo as "pipeline".
+ */
+describe("repoRoot / repoName", () => {
+  it("returns the trimmed repository root", () => {
+    const run = (args: string[]): string => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return "/home/me/code/beacon\n";
+      throw new Error("unexpected");
+    };
+    expect(repoRoot(run)).toBe("/home/me/code/beacon");
+  });
+
+  it("returns null outside a work tree", () => {
+    const run = (): string => {
+      throw new Error("fatal: not a git repository");
+    };
+    expect(repoRoot(run)).toBeNull();
+  });
+
+  it("returns null when git answers with nothing", () => {
+    const run = (): string => "\n";
+    expect(repoRoot(run)).toBeNull();
+  });
+
+  it("names the snapshot after the repo root, not the working directory", () => {
+    const run = (args: string[]): string => {
+      const key = args.join(" ");
+      if (key === "rev-parse --is-inside-work-tree") return "true\n";
+      if (key === "rev-parse --show-toplevel") return "/srv/checkouts/acme-payments\n";
+      if (key === "rev-parse --verify HEAD~1") return "okhash\n";
+      if (key.startsWith("log -1")) return "deadbeef\nAdd thing\n";
+      if (key.startsWith("diff --name-only")) return "src/a.ts";
+      if (key.startsWith("diff --numstat")) return "1\t0\tsrc/a.ts";
+      if (key.startsWith("diff ")) return "+const a = 1;";
+      throw new Error(`unexpected git call: ${key}`);
+    };
+
+    // The fake root's basename must differ from the test process's cwd, or a
+    // regression to `basename(process.cwd())` satisfies this by coincidence:
+    // the suite runs from the beacon repo root, which is itself a repo.
+    expect(getSnapshot(8000, run).repoName).toBe("acme-payments");
+  });
+
+  it("falls back to the working directory when git cannot answer", () => {
+    const run = (args: string[]): string => {
+      const key = args.join(" ");
+      if (key === "rev-parse --is-inside-work-tree") return "true\n";
+      if (key === "rev-parse --show-toplevel") throw new Error("fatal: no toplevel");
+      if (key === "rev-parse --verify HEAD~1") return "okhash\n";
+      if (key.startsWith("log -1")) return "deadbeef\nAdd thing\n";
+      if (key.startsWith("diff --name-only")) return "src/a.ts";
+      if (key.startsWith("diff --numstat")) return "1\t0\tsrc/a.ts";
+      if (key.startsWith("diff ")) return "+const a = 1;";
+      throw new Error(`unexpected git call: ${key}`);
+    };
+
+    expect(getSnapshot(8000, run).repoName).toBe(basename(process.cwd()));
   });
 });
