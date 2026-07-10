@@ -1,5 +1,9 @@
-import { loadConfig, maskKey, saveConfig } from "../../lib/config.js";
+import { c } from "../../lib/colors.js";
+import { apiKeySource, loadConfig, maskKey, saveConfig } from "../../lib/config.js";
+import { DEFAULT_BASE_URL } from "../../lib/llm/endpoints.js";
 import { logger } from "../../lib/logger.js";
+import { configPath } from "../../lib/paths.js";
+import { banner, keyValueLines } from "../../lib/ui.js";
 import {
   BeaconError,
   PLATFORM_NAMES,
@@ -106,13 +110,54 @@ function setPlatform(name: string, state: string): void {
   logger.success(`platform ${platform} ${on ? "enabled" : "disabled"}`);
 }
 
-function show(): void {
+/** Machine-readable dump (API key masked) for scripts: `config show --json`. */
+function showJson(): void {
   const config = loadConfig();
   const safe = {
     ...config,
     apiKey: maskKey(config.apiKey),
   };
   logger.plain(JSON.stringify(safe, null, 2));
+}
+
+/**
+ * Human view: aligned key/value block that also answers the question raw JSON
+ * cannot — *which* key is actually in effect when an env var overrides the
+ * stored one.
+ */
+function show(): void {
+  const config = loadConfig();
+  const key = apiKeySource(config);
+  const isOllama = config.provider === "openai" && Boolean(config.baseUrl?.includes(":11434"));
+
+  const apiKeyDisplay =
+    key.source === "env"
+      ? `${maskKey(process.env[key.envVar] ?? "")} ${c.dim(`(from ${key.envVar} — overrides config.json)`)}`
+      : key.source === "config"
+        ? `${maskKey(config.apiKey)} ${c.dim("(config.json)")}`
+        : c.warn("not set — run `beacon init`");
+
+  const platforms = PLATFORM_NAMES.map((name) =>
+    config.platforms[name] ? c.success(name) : c.dim(`${name} (off)`),
+  ).join("  ");
+
+  banner("config");
+  const lines = keyValueLines([
+    ["provider", `${config.provider}${isOllama ? c.dim(" (Ollama — local)") : ""}`],
+    ["model", c.accent(config.model)],
+    ["api key", apiKeyDisplay],
+    ["base url", config.baseUrl ?? c.dim(`${DEFAULT_BASE_URL[config.provider]} (default)`)],
+    ["language", config.language],
+    ["threshold", `${config.significanceThreshold} ${c.dim("(min significance to draft, 0–10)")}`],
+    ["platforms", platforms],
+    ["author", config.authorName],
+    ["bio", config.authorBio],
+    ["voice notes", config.authorNotes],
+    ["enabled", config.enabled ? undefined : c.warn("false")],
+    ["config file", c.dim(configPath())],
+  ]);
+  for (const line of lines) logger.plain(`  ${line}`);
+  logger.plain("");
 }
 
 /** Dispatch for `beacon config set <field> <value...>`. */
@@ -170,7 +215,11 @@ export function configSetCommand(field: string, values: string[]): void {
   }
 }
 
-export function configShowCommand(): void {
+export function configShowCommand(options: { json?: boolean } = {}): void {
+  if (options.json) {
+    showJson();
+    return;
+  }
   show();
 }
 

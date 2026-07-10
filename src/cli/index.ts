@@ -1,5 +1,7 @@
 import { Command } from "commander";
 import { logger } from "../lib/logger.js";
+import { PromptCancelled } from "../lib/prompts.js";
+import { VERSION } from "../lib/version.js";
 import { isBeaconError } from "../types/index.js";
 import { configSetCommand, configShowCommand } from "./commands/config.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -18,9 +20,15 @@ import { uiCommand } from "./commands/ui.js";
  * friendly stderr messages; `run` swallows non-critical errors into the log.
  */
 
-// Replaced at build time by tsup `define`; falls back when run un-bundled.
-declare const __BEACON_VERSION__: string;
-const VERSION = typeof __BEACON_VERSION__ !== "undefined" ? __BEACON_VERSION__ : "0.0.0-dev";
+// A closed pipe (`beacon config show | head`) must end the process quietly,
+// not crash it with an unhandled stream error. Registered before anything
+// writes to stdout/stderr.
+function exitQuietlyOnEpipe(err: NodeJS.ErrnoException): void {
+  if (err.code === "EPIPE") process.exit(0);
+  throw err;
+}
+process.stdout.on("error", exitQuietlyOnEpipe);
+process.stderr.on("error", exitQuietlyOnEpipe);
 
 const program = new Command();
 
@@ -136,8 +144,9 @@ config
 config
   .command("show")
   .description("Show current config (API key masked).")
-  .action(() => {
-    runInteractive(() => configShowCommand());
+  .option("--json", "Print the raw config as JSON (for scripts).", false)
+  .action((opts: { json?: boolean }) => {
+    runInteractive(() => configShowCommand({ json: opts.json ?? false }));
   });
 
 /** Wrap a sync interactive handler: friendly error to stderr, exit code 1. */
@@ -159,9 +168,8 @@ async function runInteractiveAsync(fn: () => Promise<void>): Promise<void> {
 }
 
 function reportInteractiveError(err: unknown): void {
-  // @inquirer throws this when the user hits Ctrl-C; treat as a clean exit.
-  if (err instanceof Error && err.name === "ExitPromptError") {
-    logger.info("Cancelled.");
+  // Ctrl-C at a prompt; lib/prompts.ts already printed the cancel line.
+  if (err instanceof PromptCancelled) {
     return;
   }
   if (isBeaconError(err)) {

@@ -76,6 +76,19 @@ export function hasApiKey(config: BeaconConfig): boolean {
   return Boolean(process.env[envName]?.trim() || config.apiKey.trim());
 }
 
+/** Where the effective API key comes from, for display (`beacon config show`). */
+export type ApiKeySource =
+  | { source: "env"; envVar: string }
+  | { source: "config" }
+  | { source: "none" };
+
+export function apiKeySource(config: BeaconConfig): ApiKeySource {
+  const envVar = PROVIDER_ENV[config.provider];
+  if (process.env[envVar]?.trim()) return { source: "env", envVar };
+  if (config.apiKey.trim()) return { source: "config" };
+  return { source: "none" };
+}
+
 /** Mask a key for display, e.g. `sk-ant…f9a2`. */
 export function maskKey(key: string): string {
   if (!key) return "(not set)";

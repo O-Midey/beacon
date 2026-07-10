@@ -46,7 +46,7 @@
     "url": "https://github.com/O-Midey/beacon/issues"
   },
   "dependencies": {
-    "@inquirer/prompts": "^7.2.1",
+    "@clack/prompts": "^1.7.0",
     "clipboardy": "^4.0.0",
     "commander": "^12.1.0",
     "nanoid": "^5.0.9",

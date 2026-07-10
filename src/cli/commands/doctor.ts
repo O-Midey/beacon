@@ -9,6 +9,7 @@ import { pingProvider } from "../../lib/llm/index.js";
 import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
 import { inspectRepoConfig, type RepoConfigStatus } from "../../lib/repo-config.js";
 import { startSpinner } from "../../lib/spinner.js";
+import { banner } from "../../lib/ui.js";
 import { isBeaconError, type BeaconConfig } from "../../types/index.js";
 
 /**
@@ -173,7 +174,7 @@ export function checkRepoConfig(): Check {
 }
 
 export async function doctorCommand(): Promise<void> {
-  logger.plain(c.bold("\n  Beacon doctor\n"));
+  banner("doctor");
 
   // The global config drives the provider ping: a repo may never set the
   // provider, model, key, or base URL, so there is nothing to overlay here.

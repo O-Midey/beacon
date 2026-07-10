@@ -1,6 +1,6 @@
-import { confirm } from "@inquirer/prompts";
 import { readFileSync } from "node:fs";
 import { c } from "../../lib/colors.js";
+import { confirm, intro, log, note, outro } from "../../lib/prompts.js";
 import { loadConfig } from "../../lib/config.js";
 import { repoRoot } from "../../lib/git.js";
 import { logger } from "../../lib/logger.js";
@@ -104,36 +104,41 @@ export async function trustCommand(options: TrustOptions = {}): Promise<void> {
   const global = loadConfig();
   const delta = describeDelta(global, resolveConfig(global, repoConfig));
 
-  logger.plain("");
-  logger.plain(`${c.bold(REPO_CONFIG_FILENAME)} ${c.dim(status.path)}`);
-  logger.plain(c.dim(`sha256 ${hash.slice(0, 16)}…`));
-  logger.plain("");
-
-  if (delta.length === 0) {
-    logger.plain(c.dim("It changes nothing about your current config."));
-  } else {
-    logger.plain("If you trust it, this repository will change:");
-    for (const line of delta) logger.plain(`  ${line}`);
+  // `--yes` is for scripted setup of a repo the user already reviewed; skip
+  // the interactive ceremony entirely.
+  if (options.yes) {
+    saveTrustStore(trustRepo(loadTrustStore(), root, hash));
+    logger.success(`Trusted. ${c.code(REPO_CONFIG_FILENAME)} now applies in ${root}.`);
+    logger.info(`Editing it revokes trust — re-run ${c.code("beacon trust")} after any change.`);
+    return;
   }
 
-  logger.plain("");
-  logger.plain(
-    c.dim(
-      "It can never set your provider, model, API key, or base URL — those are yours alone.",
-    ),
-  );
-  logger.plain("");
+  intro("trust");
+  log.message(`${c.bold(REPO_CONFIG_FILENAME)} ${c.dim(status.path)}\n${c.dim(`sha256 ${hash.slice(0, 16)}…`)}`);
 
-  const approved =
-    options.yes ||
-    (await confirm({ message: `Trust ${REPO_CONFIG_FILENAME} in this repository?`, default: false }));
+  if (delta.length === 0) {
+    log.message(c.dim("It changes nothing about your current config."));
+  } else {
+    note(delta.join("\n"), "If you trust it, this repository will change");
+  }
+
+  log.message(
+    c.dim("It can never set your provider, model, API key, or base URL — those are yours alone."),
+  );
+
+  const approved = await confirm({
+    message: `Trust ${REPO_CONFIG_FILENAME} in this repository?`,
+    initialValue: false,
+  });
 
   if (!approved) {
-    logger.info("Left untrusted. Beacon will keep using your global config here.");
+    outro("Left untrusted. Beacon will keep using your global config here.");
     return;
   }
 
   saveTrustStore(trustRepo(loadTrustStore(), root, hash));
-  logger.success(`Trusted. ${c.code(REPO_CONFIG_FILENAME)} now applies in ${root}.`);
-  logger.info(`Editing it revokes trust — re-run ${c.code("beacon trust")} after any change.`);
+  outro(
+    `Trusted. ${c.code(REPO_CONFIG_FILENAME)} now applies in ${root}.\n` +
+      c.dim(`   Editing it revokes trust — re-run \`beacon trust\` after any change.`),
+  );
 }
