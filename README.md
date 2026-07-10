@@ -50,7 +50,7 @@ Privacy-first product, privacy-first model: with Ollama your diff never leaves y
 ## Why Beacon?
 
 - **Zero friction** — commit normally; drafts appear in the background.
-- **Secret-safe** — a regex scanner runs *before* any LLM call. A leaked key blocks drafting entirely; secrets are redacted from everything the model sees.
+- **Secret-safe** — a regex scanner runs _before_ any LLM call. A leaked key blocks drafting entirely; secrets are redacted from everything the model sees.
 - **Voice-consistent** — your identity, voice notes, and language from config; platform-adapted drafts from one prompt.
 - **Opinionated filter** — routine refactors, typo fixes, and dep bumps are skipped automatically (configurable threshold).
 - **Digest mode** — `beacon draft --week` turns a week of commits into one "here's what I shipped" post.
@@ -66,13 +66,13 @@ The pipeline is five strictly-separated stages:
 capture → safety → significance → draft → queue
 ```
 
-| Stage | What it does |
-| --- | --- |
-| **Capture** | Reads the commit (or commit range) diff, message, and changed-file stats into a typed snapshot. Diff is truncated for cost control. |
-| **Safety** | Regex-only scan (no LLM) of **the diff and the commit message** — both reach the model — for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. Runs before *any* LLM call. **Critical findings block drafting; warnings are redacted.** Every later stage receives only the redacted snapshot. |
-| **Significance** | An LLM call scores the commit 0–10 (on the redacted snapshot). Routine changes fall below the threshold (default: 6) and are skipped. |
-| **Draft** | A single LLM call produces drafts for every **enabled** platform, in your voice and language, receiving only the redacted snapshot. |
-| **Queue** | Drafts are persisted atomically to `~/.beacon/queue.json` (capped at 50 entries) for `beacon review`. |
+| Stage            | What it does                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Capture**      | Reads the commit (or commit range) diff, message, and changed-file stats into a typed snapshot. Diff is truncated for cost control.                                                                                                                                                                                                                               |
+| **Safety**       | Regex-only scan (no LLM) of **the diff and the commit message** — both reach the model — for API keys, private-key headers, JWTs, DB connection strings, `.env` assignments, private IPs, and internal hostnames. Runs before _any_ LLM call. **Critical findings block drafting; warnings are redacted.** Every later stage receives only the redacted snapshot. |
+| **Significance** | An LLM call scores the commit 0–10 (on the redacted snapshot). Routine changes fall below the threshold (default: 6) and are skipped.                                                                                                                                                                                                                             |
+| **Draft**        | A single LLM call produces drafts for every **enabled** platform, in your voice and language, receiving only the redacted snapshot.                                                                                                                                                                                                                               |
+| **Queue**        | Drafts are persisted atomically to `~/.beacon/queue.json` (capped at 50 entries) for `beacon review`.                                                                                                                                                                                                                                                             |
 
 ---
 
@@ -131,7 +131,7 @@ It stays as local as everything else:
   **per-session token** — a random page on the internet cannot read your
   drafts through your own browser (CSRF/DNS-rebinding is blocked by a
   host-header allowlist on top of the token).
-- The token travels in the URL *fragment*, which browsers never send over the
+- The token travels in the URL _fragment_, which browsers never send over the
   network.
 - Close the tab, `Ctrl-C` the process, and nothing is left running. No
   telemetry, no external requests — the page's Content-Security-Policy
@@ -169,19 +169,19 @@ beacon config set api-key ollama
 
 All config lives in `~/.beacon/config.json` (mode `0600`).
 
-| Key | Default | Notes |
-| --- | --- | --- |
-| `provider` | `anthropic` | `anthropic` or `openai` (any OpenAI-compatible endpoint, incl. Ollama). |
-| `apiKey` | `""` | Provider env var (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) overrides it. |
-| `baseUrl` | — | Base URL for the `openai` provider. Ignored for `anthropic`. |
-| `significanceThreshold` | `6` | Minimum score (0–10) to draft. Lower = more drafts. |
-| `authorName` | — | Your name, used in the drafter's voice prompt. |
-| `authorBio` | — | How posts describe you, e.g. `"a fullstack engineer building devtools"`. |
-| `authorNotes` | — | Voice notes appended to the drafter prompt (tone, phrases to avoid…). |
-| `language` | `English` | Language all drafts are written in — any language name works. |
-| `platforms` | see notes | `twitter` / `linkedin` / `devto` on, `bluesky` / `mastodon` off. Toggle each with `beacon config set platform <name> <on\|off>`. |
-| `model` | `claude-sonnet-4-6` | Model ID for the active provider. |
-| `maxDiffChars` | `8000` | Diff truncation limit before LLM calls. |
+| Key                     | Default             | Notes                                                                                                                            |
+| ----------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `provider`              | `anthropic`         | `anthropic` or `openai` (any OpenAI-compatible endpoint, incl. Ollama).                                                          |
+| `apiKey`                | `""`                | Provider env var (`ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) overrides it.                                                          |
+| `baseUrl`               | —                   | Base URL for the `openai` provider. Ignored for `anthropic`.                                                                     |
+| `significanceThreshold` | `6`                 | Minimum score (0–10) to draft. Lower = more drafts.                                                                              |
+| `authorName`            | —                   | Your name, used in the drafter's voice prompt.                                                                                   |
+| `authorBio`             | —                   | How posts describe you, e.g. `"a fullstack engineer building devtools"`.                                                         |
+| `authorNotes`           | —                   | Voice notes appended to the drafter prompt (tone, phrases to avoid…).                                                            |
+| `language`              | `English`           | Language all drafts are written in — any language name works.                                                                    |
+| `platforms`             | see notes           | `twitter` / `linkedin` / `devto` on, `bluesky` / `mastodon` off. Toggle each with `beacon config set platform <name> <on\|off>`. |
+| `model`                 | `claude-sonnet-4-6` | Model ID for the active provider.                                                                                                |
+| `maxDiffChars`          | `8000`              | Diff truncation limit before LLM calls.                                                                                          |
 
 ---
 
@@ -224,4 +224,4 @@ hooks/         post-commit template
 
 ## License
 
-MIT © [Mide](https://omotosho.xyz)
+MIT © [Omotosho](https://omotosho.xyz)
