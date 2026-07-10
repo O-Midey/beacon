@@ -9,8 +9,8 @@ import { draftPlatforms, formatPlatform, platformLabel } from "../../lib/format.
 import { logger } from "../../lib/logger.js";
 import {
   loadQueue,
+  mutateQueue,
   pendingEntries,
-  saveQueue,
   setEntryStatus,
   statusCounts,
   updateDraftSet,
@@ -147,15 +147,20 @@ export async function reviewCommand(): Promise<void> {
   );
 }
 
-/** Apply a single action to one entry; persists and returns the new queue. */
+/**
+ * Apply a single action to one entry; persists and returns the new queue.
+ *
+ * Each persisted step goes through `mutateQueue`, which re-reads the queue
+ * under the cross-process lock — so a draft enqueued by the git hook while the
+ * user sits on a prompt is never clobbered by a stale in-memory copy.
+ */
 async function applyAction(action: Action, queue: Queue, entry: QueueEntry): Promise<Queue> {
   switch (action) {
     case "skip":
       return queue;
 
     case "discard": {
-      const next = setEntryStatus(queue, entry.id, "discarded");
-      saveQueue(next);
+      const next = await mutateQueue((q) => setEntryStatus(q, entry.id, "discarded"));
       logger.info("Discarded.");
       return next;
     }
@@ -163,23 +168,19 @@ async function applyAction(action: Action, queue: Queue, entry: QueueEntry): Pro
     case "approve": {
       const platform = await choosePlatform("Copy which platform to clipboard?", entry);
       await copyToClipboard(platform, entry.draftSet);
-      const next = setEntryStatus(queue, entry.id, "approved");
-      saveQueue(next);
-      return next;
+      return mutateQueue((q) => setEntryStatus(q, entry.id, "approved"));
     }
 
     case "edit": {
       const platform = await choosePlatform("Edit which platform?", entry);
       const edited = editPlatformDraft(platform, entry.draftSet);
       if (!edited) return queue;
-      let next = updateDraftSet(queue, entry.id, edited);
-      saveQueue(next);
+      let next = await mutateQueue((q) => updateDraftSet(q, entry.id, edited));
       logger.success(`${platformLabel(platform)} draft updated.`);
       const approveNow = await confirm({ message: "Approve this edited draft now?", default: true });
       if (approveNow) {
         await copyToClipboard(platform, edited);
-        next = setEntryStatus(next, entry.id, "approved");
-        saveQueue(next);
+        next = await mutateQueue((q) => setEntryStatus(q, entry.id, "approved"));
       }
       return next;
     }

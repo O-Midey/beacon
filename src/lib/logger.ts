@@ -1,7 +1,7 @@
 import {
   appendFileSync,
+  chmodSync,
   existsSync,
-  mkdirSync,
   readdirSync,
   renameSync,
   statSync,
@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { c } from "./colors.js";
-import { beaconLogPath } from "./paths.js";
+import { beaconLogPath, ensureBeaconHome, FILE_MODE } from "./paths.js";
 
 /**
  * Consistent stdout/stderr/log-file formatting for Beacon.
@@ -103,12 +103,25 @@ function rotateIfNeeded(): void {
   }
 }
 
-/** Append a single structured line to the Beacon log file. Never throws. */
+/**
+ * Append a single structured line to the Beacon log file. Never throws.
+ *
+ * On a fresh install the git hook can reach this before any config write, so
+ * this is a path that creates `~/.beacon` — it must create it owner-only, or
+ * every later file inherits a world-traversable directory. Log lines carry
+ * commit messages and `BeaconError.context`, so the file is 0600 too.
+ */
 export function logToFile(level: string, message: string): void {
   try {
-    mkdirSync(dirname(beaconLogPath()), { recursive: true });
+    ensureBeaconHome();
     rotateIfNeeded();
-    appendFileSync(beaconLogPath(), `[${timestamp()}] ${level.toUpperCase()} ${message}\n`);
+    const path = beaconLogPath();
+    appendFileSync(path, `[${timestamp()}] ${level.toUpperCase()} ${message}\n`, {
+      mode: FILE_MODE,
+    });
+    // `mode` applies only when appendFileSync creates the file; re-assert so a
+    // log left 0644 by an older Beacon is repaired on the next write.
+    chmodSync(path, FILE_MODE);
   } catch {
     // Logging must never crash the pipeline.
   }

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { nanoid } from "nanoid";
 import {
   BeaconError,
@@ -11,7 +11,8 @@ import {
   type SignificanceResult,
   type WorkspaceSnapshot,
 } from "../types/index.js";
-import { beaconHome, queuePath, queueTmpPath } from "../lib/paths.js";
+import { withFileLock } from "../lib/lock.js";
+import { ensureBeaconHome, FILE_MODE, queueLockPath, queuePath, queueTmpPath } from "../lib/paths.js";
 
 /**
  * Stage 5 — Queue.
@@ -20,15 +21,16 @@ import { beaconHome, queuePath, queueTmpPath } from "../lib/paths.js";
  * then rename) so a crash mid-write cannot corrupt the queue. Newest entries are
  * prepended; the queue is capped at MAX_ENTRIES by evicting the oldest
  * already-discarded entries first.
+ *
+ * The persisted snapshot always carries the REDACTED diff, never the raw one:
+ * `warning`-severity findings (an `.env` assignment, a long token near a
+ * keyword) are hidden from the LLM but do not block drafting, so a raw snapshot
+ * would write the very secret the scanner just caught to disk in plaintext.
+ * Nothing downstream reads the diff back, so there is nothing to lose.
  */
 
 export const MAX_ENTRIES = 50;
 const EMPTY_QUEUE: Queue = { version: 1, entries: [] };
-
-function ensureHome(): void {
-  const home = beaconHome();
-  if (!existsSync(home)) mkdirSync(home, { recursive: true, mode: 0o700 });
-}
 
 /** Load and validate the queue. A missing file yields an empty queue. */
 export function loadQueue(): Queue {
@@ -55,14 +57,17 @@ export function loadQueue(): Queue {
   return parsed.data;
 }
 
-/** Atomically write the queue to disk. */
+/** Atomically write the queue to disk, owner-readable only. */
 export function saveQueue(queue: Queue): void {
-  ensureHome();
+  ensureBeaconHome();
   const tmp = queueTmpPath();
   // Validate before persisting so we never write a malformed queue.
   const validated = QueueSchema.parse(queue);
-  writeFileSync(tmp, JSON.stringify(validated, null, 2), "utf8");
+  writeFileSync(tmp, JSON.stringify(validated, null, 2), { encoding: "utf8", mode: FILE_MODE });
   renameSync(tmp, queuePath());
+  // `mode` is masked by the umask and ignored when the tmp file already exists;
+  // re-assert so an existing 0644 queue is repaired on the next write.
+  chmodSync(queuePath(), FILE_MODE);
 }
 
 /**
@@ -87,6 +92,19 @@ export function enforceCap(entries: QueueEntry[], max: number = MAX_ENTRIES): Qu
   return keep;
 }
 
+/**
+ * Swap the raw diff for the redacted one before persistence. Pure.
+ *
+ * This is the only place a snapshot crosses from memory to disk, so it is the
+ * only place the substitution has to happen.
+ */
+export function redactSnapshot(
+  snapshot: WorkspaceSnapshot,
+  safety: SafetyScanResult,
+): WorkspaceSnapshot {
+  return { ...snapshot, diff: safety.redactedDiff };
+}
+
 /** Build a fresh pending QueueEntry. Pure; takes all stage outputs. */
 export function buildEntry(input: {
   draftSet: DraftSet;
@@ -98,7 +116,7 @@ export function buildEntry(input: {
     id: nanoid(),
     status: "pending",
     draftSet: input.draftSet,
-    snapshot: input.snapshot,
+    snapshot: redactSnapshot(input.snapshot, input.safety),
     significance: input.significance,
     safety: input.safety,
     createdAt: new Date(),
@@ -114,17 +132,33 @@ export function addEntry(queue: Queue, entry: QueueEntry): Queue {
 }
 
 /**
- * Load → prepend → cap → save. Returns the persisted entry id.
+ * Serialized read-modify-write. Every mutation of the persisted queue MUST go
+ * through here: the git hook, `beacon review`, and `beacon serve` can all
+ * write concurrently, and an unguarded load → save cycle silently drops
+ * whichever update loses the race (the atomic rename in `saveQueue` prevents
+ * corruption, not lost updates). Holds a cross-process file lock for the whole
+ * cycle and returns the queue as persisted.
  */
-export function enqueue(input: {
+export async function mutateQueue(mutate: (queue: Queue) => Queue): Promise<Queue> {
+  ensureBeaconHome();
+  return withFileLock(queueLockPath(), () => {
+    const next = mutate(loadQueue());
+    saveQueue(next);
+    return next;
+  });
+}
+
+/**
+ * Load → prepend → cap → save, under the queue lock. Returns the entry id.
+ */
+export async function enqueue(input: {
   draftSet: DraftSet;
   snapshot: WorkspaceSnapshot;
   significance: SignificanceResult;
   safety: SafetyScanResult;
-}): string {
+}): Promise<string> {
   const entry = buildEntry(input);
-  const queue = addEntry(loadQueue(), entry);
-  saveQueue(queue);
+  await mutateQueue((queue) => addEntry(queue, entry));
   return entry.id;
 }
 

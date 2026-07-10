@@ -14,7 +14,14 @@ export type BeaconErrorCode =
   | "RATE_LIMITED"
   | "NETWORK_ERROR"
   | "CONFIG_MISSING"
-  | "QUEUE_CORRUPT";
+  | "QUEUE_CORRUPT"
+  | "QUEUE_LOCKED"
+  | "UNAUTHORIZED"
+  | "NOT_FOUND"
+  | "BAD_REQUEST"
+  | "VALIDATION_ERROR"
+  | "PORT_IN_USE"
+  | "ALREADY_RUNNING";
 
 /**
  * Base error for all Beacon failures. Carries a machine-readable `code` so

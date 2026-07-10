@@ -73,7 +73,7 @@ export async function runPipeline(
 
   // Stage 5 — Queue
   stage("queue");
-  const entryId = enqueue({ draftSet, snapshot, significance, safety });
+  const entryId = await enqueue({ draftSet, snapshot, significance, safety });
 
   return { kind: "queued", entryId, snapshot, significance, safety };
 }
