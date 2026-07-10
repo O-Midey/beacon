@@ -8,6 +8,7 @@ import { initCommand } from "./commands/init.js";
 import { installCommand } from "./commands/install.js";
 import { reviewCommand } from "./commands/review.js";
 import { runCommand } from "./commands/run.js";
+import { trustCommand } from "./commands/trust.js";
 import { DEFAULT_PORT, serveCommand } from "./commands/serve.js";
 import { uiCommand } from "./commands/ui.js";
 
@@ -62,6 +63,17 @@ program
   .description("Interactively review pending drafts.")
   .action(async () => {
     await runInteractiveAsync(() => reviewCommand());
+  });
+
+program
+  .command("trust")
+  .description("Review and approve this repository's .beacon.json (ignored until you do).")
+  .option("--revoke", "Forget this repository's approval; its .beacon.json stops applying.", false)
+  .option("-y, --yes", "Approve without the confirmation prompt.", false)
+  .action(async (opts: { revoke?: boolean; yes?: boolean }) => {
+    await runInteractiveAsync(() =>
+      trustCommand({ revoke: opts.revoke ?? false, yes: opts.yes ?? false }),
+    );
   });
 
 program
