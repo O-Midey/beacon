@@ -6,6 +6,8 @@ import { hasApiKey, loadConfig } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
 import { DEFAULT_BASE_URL } from "../../lib/llm/endpoints.js";
 import { pingProvider } from "../../lib/llm/index.js";
+import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
+import { inspectRepoConfig, type RepoConfigStatus } from "../../lib/repo-config.js";
 import { startSpinner } from "../../lib/spinner.js";
 import { isBeaconError, type BeaconConfig } from "../../types/index.js";
 
@@ -133,9 +135,48 @@ function checkBeaconOnPath(): Check {
   }
 }
 
+/**
+ * Which config layers are in effect here. The interesting case is a
+ * `.beacon.json` that exists but is untrusted: everything looks configured, yet
+ * none of the repo's settings apply. Breaking that silence is doctor's job.
+ */
+export function checkRepoConfig(): Check {
+  let status: RepoConfigStatus;
+  try {
+    status = inspectRepoConfig();
+  } catch (err) {
+    return {
+      level: "fail",
+      label: `${REPO_CONFIG_FILENAME} could not be read`,
+      hint: isBeaconError(err) ? err.message : String(err),
+    };
+  }
+
+  switch (status.kind) {
+    case "not-a-repo":
+      return { level: "ok", label: "Config: global only (not inside a git repository)" };
+    case "none":
+      return { level: "ok", label: `Config: global only (no ${REPO_CONFIG_FILENAME} here)` };
+    case "untrusted":
+      return {
+        level: "warn",
+        label: `${REPO_CONFIG_FILENAME} present but untrusted — its settings are ignored`,
+        hint: `Run \`beacon trust\` to review and approve it: ${status.path}`,
+      };
+    case "trusted":
+      return {
+        level: "ok",
+        label: `Config: global + trusted ${REPO_CONFIG_FILENAME}`,
+        hint: status.path,
+      };
+  }
+}
+
 export async function doctorCommand(): Promise<void> {
   logger.plain(c.bold("\n  Beacon doctor\n"));
 
+  // The global config drives the provider ping: a repo may never set the
+  // provider, model, key, or base URL, so there is nothing to overlay here.
   const config = loadConfig();
   const keyPresent = hasApiKey(config);
 
@@ -143,6 +184,7 @@ export async function doctorCommand(): Promise<void> {
     checkNode(),
     checkGit(),
     ...configChecks(config, keyPresent),
+    checkRepoConfig(),
     checkHook(),
     checkBeaconOnPath(),
   ];

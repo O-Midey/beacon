@@ -14,6 +14,7 @@ export type BeaconErrorCode =
   | "RATE_LIMITED"
   | "NETWORK_ERROR"
   | "CONFIG_MISSING"
+  | "REPO_CONFIG_INVALID"
   | "QUEUE_CORRUPT"
   | "QUEUE_LOCKED"
   | "UNAUTHORIZED"
@@ -242,6 +243,55 @@ export const BeaconConfigSchema = z.object({
   platforms: PlatformTogglesSchema.default({}),
   model: z.string().default("claude-sonnet-4-6"),
   maxDiffChars: z.number().int().positive().default(8000),
+  /** When false, the hook is a no-op: no LLM call, no draft, no spend. */
+  enabled: z.boolean().default(true),
 });
 /** Config as persisted on disk and consumed across the app. */
 export type BeaconConfig = z.infer<typeof BeaconConfigSchema>;
+
+/* -------------------------------------------------------------------------- */
+/*  Per-repository config (`.beacon.json`)                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Keys a repository may never set, at any trust level.
+ *
+ * A `.beacon.json` arrives on your machine by `git clone`, from a stranger. It
+ * is untrusted input in exactly the way a diff is. These four decide *where
+ * your diff goes and with what credential*: a repo that can set `baseUrl` can
+ * point your API key and your private diff at any host on the internet, and you
+ * would never see it happen.
+ *
+ * The dividing line: a repository may influence **whether and what** gets
+ * drafted. Only you decide **who you are, where the bytes go, and with what
+ * credential.**
+ */
+export const REPO_CONFIG_FORBIDDEN_KEYS = ["apiKey", "baseUrl", "provider", "model"] as const;
+
+/**
+ * The subset of config a trusted repository may override. `.strict()` is
+ * load-bearing: Zod strips unknown keys by default, which would silently ignore
+ * a `baseUrl` rather than refusing the file. Refusing is the point.
+ */
+export const RepoConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    platforms: PlatformTogglesSchema.partial().optional(),
+    significanceThreshold: z.number().min(0).max(10).optional(),
+    language: z.string().optional(),
+    /**
+     * Reaches the drafter's system prompt, so it is prompt-injection surface.
+     * Permitted only because it is what makes "never name the client in this
+     * repo" possible — and only from a file you explicitly trusted.
+     */
+    authorNotes: z.string().optional(),
+  })
+  .strict();
+export type RepoConfig = z.infer<typeof RepoConfigSchema>;
+
+/** Trust ledger: absolute repo root → SHA-256 of the `.beacon.json` you approved. */
+export const TrustStoreSchema = z.object({
+  version: z.literal(1),
+  repos: z.record(z.string(), z.string()),
+});
+export type TrustStore = z.infer<typeof TrustStoreSchema>;

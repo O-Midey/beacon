@@ -60,6 +60,14 @@ export function serveStatePath(): string {
   return join(beaconHome(), "serve.json");
 }
 
+/** Ledger of repo-supplied `.beacon.json` files the user has explicitly approved. */
+export function trustStorePath(): string {
+  return join(beaconHome(), "trusted.json");
+}
+
+/** Name of the per-repository config file, resolved against the repo root. */
+export const REPO_CONFIG_FILENAME = ".beacon.json";
+
 export function beaconLogPath(): string {
   return join(beaconHome(), "beacon.log");
 }

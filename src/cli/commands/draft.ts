@@ -1,9 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { c } from "../../lib/colors.js";
-import { loadConfig } from "../../lib/config.js";
-import { getRangeSnapshot, getSnapshot } from "../../lib/git.js";
+import { getRangeSnapshot, getSnapshot, repoRoot } from "../../lib/git.js";
 import { logger } from "../../lib/logger.js";
+import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
+import { loadEffectiveConfig } from "../../lib/repo-config.js";
 import { startSpinner } from "../../lib/spinner.js";
 import { runPipeline, type PipelineStage } from "../../pipeline/index.js";
 import { BeaconError, isBeaconError, type WorkspaceSnapshot } from "../../types/index.js";
@@ -62,12 +63,29 @@ function snapshotFromFile(filePath: string, message: string | undefined): Worksp
     insertions: 0,
     deletions: 0,
     timestamp: new Date(),
-    repoName: basename(process.cwd()),
+    // Same reason as getSnapshot: name the repo, not whatever directory the
+    // user happened to run from. A `--file` draft may be outside a repo at all.
+    repoName: basename(repoRoot() ?? process.cwd()),
   };
 }
 
 export async function draftCommand(options: DraftOptions = {}): Promise<void> {
-  const config = loadConfig();
+  const { config, repo } = loadEffectiveConfig();
+
+  if (repo.kind === "untrusted") {
+    logger.warn(
+      `Ignoring untrusted ${REPO_CONFIG_FILENAME} — run ${c.code("beacon trust")} to apply it.`,
+    );
+  }
+
+  // A repo that opted out stays opted out, even for an explicit `beacon draft`.
+  // The opt-out is the repository's policy, not a hook-only convenience; the
+  // escape hatch is to change `.beacon.json`, not to bypass it from the CLI.
+  if (!config.enabled) {
+    logger.info(`Beacon is disabled for this repository (${REPO_CONFIG_FILENAME}).`);
+    return;
+  }
+
   if (!ensureConfigured(config)) return;
 
   let snapshot: WorkspaceSnapshot;
