@@ -12,7 +12,7 @@ import {
  *
  *   beacon config set provider <anthropic|openai>
  *   beacon config set api-key <key>
- *   beacon config set base-url <url>            (OpenAI-compatible only)
+ *   beacon config set base-url <url>            (any provider; proxies/gateways)
  *   beacon config set significance-threshold <0-10>
  *   beacon config set author-name <name>
  *   beacon config set author-bio <text...>

@@ -6,31 +6,26 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Fixed
-
-- `beacon doctor` reported "Beacon looks healthy" and exited `0` even when the
-  live provider ping failed — an invalid API key passed the very check meant to
-  catch it. The ping result now joins the check list and drives the exit code.
-
 ### Changed
 
-- `beacon doctor` prints the base URL for every provider, not just `openai`,
-  and the network-error hint mentions `base-url` for both.
-- Provider endpoints are resolved from one table (`llm/endpoints.ts`) instead of
-  a default URL restated in each provider and again in `doctor`.
-- The Anthropic provider now calls the Messages API directly over `fetch`
-  instead of going through `@anthropic-ai/sdk`. Beacon only ever makes a
-  single-turn, non-streaming completion, so the SDK bought little and cost a
-  lot: it was a mandatory dependency for every install (including the OpenAI
-  majority) and a static import parsed on every invocation.
+- **Leaner install** — the `anthropic` provider now calls the Messages API
+  directly instead of through `@anthropic-ai/sdk`. Beacon's LLM layer ships with
+  no runtime dependencies: seven packages fewer on every install (9.8 MB in the
+  SDK alone), and roughly 30 ms off CLI startup.
+- **`base-url` applies to every provider**, not just OpenAI-compatible ones —
+  point `anthropic` at a proxy or gateway with
+  `beacon config set base-url <url>`. `beacon doctor` now reports the base URL
+  whichever provider you use.
+
+### Fixed
+
+- `beacon doctor` exits non-zero when the live provider ping fails, as
+  documented. An invalid API key previously reported a healthy setup.
 
 ### Removed
 
-- `@anthropic-ai/sdk` runtime dependency — 9.8MB and two transitive packages
-  off every install. The LLM layer now has zero runtime dependencies.
-- `ANTHROPIC_BASE_URL` is no longer honoured for the `anthropic` provider; the
-  SDK read it implicitly, the `fetch` client does not. Set `baseUrl` in config
-  if you need to point at a proxy.
+- `ANTHROPIC_BASE_URL` is no longer read from the environment. Use
+  `beacon config set base-url <url>` instead.
 
 ## [0.3.1] - 2026-07-04
 
