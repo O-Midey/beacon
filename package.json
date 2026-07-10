@@ -18,10 +18,10 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p src/ui --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && tsc -p src/ui --noEmit",
     "prepare": "tsup",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },

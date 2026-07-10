@@ -8,6 +8,7 @@ The security model is architectural, not a promise.
   <li><strong>Scanner first, always.</strong> The regex secret scanner runs before any LLM call. The model never sees the raw diff — only a redacted, truncated version.</li>
   <li><strong>Critical findings abort drafting.</strong> A leaked key (e.g. sk-ant-…) stops the pipeline for that commit and logs which lines triggered it.</li>
   <li><strong>Keys stay on your machine.</strong> Env var or the 0600 config file — nowhere else.</li>
-  <li><strong>No server, no database, no cloud sync.</strong> Beacon&apos;s entire footprint is two JSON files under ~/.beacon/ plus a log at ~/.beacon/beacon.log. No telemetry, no accounts.</li>
+  <li><strong>No cloud, no database, no sync.</strong> Beacon&apos;s entire footprint is two JSON files under ~/.beacon/ plus a log at ~/.beacon/beacon.log. No telemetry, no accounts.</li>
+  <li><strong>The browser UI is loopback-only and token-locked.</strong> beacon ui serves on 127.0.0.1 with a fresh per-session token on every request, plus a host-header allowlist — another website open in your browser cannot reach your drafts, and neither can the network. Its Content-Security-Policy forbids the page from calling anywhere but itself. Ctrl-C and it&apos;s gone.</li>
   <li><strong>No posting credentials.</strong> Beacon cannot publish anything. Approving a draft copies it to your clipboard — that&apos;s the only way content leaves the tool.</li>
 </ul>

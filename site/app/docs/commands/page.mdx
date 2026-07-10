@@ -2,7 +2,7 @@ export const metadata = { title: "Commands" };
 
 # Commands
 
-Six commands. You'll mostly use two.
+Eight commands. You'll mostly use two.
 
 ## beacon init
 
@@ -36,12 +36,37 @@ beacon draft --since "3 days ago"   # anything git log --since accepts
 
 ## beacon review
 
-Interactive queue. Shows the significance score and every drafted platform for each entry.
+Interactive queue in the terminal. Shows the significance score and every drafted platform for each entry.
 
 - **approve** — copies the draft to your clipboard
 - **edit** — opens $EDITOR on plain text, validated on save
 - **discard** — removes it from the queue
 - **skip** — leaves it for later
+
+## beacon ui
+
+The same review queue, in your browser. Platform drafts side by side, inline
+editing, copy to clipboard — and live updates: commit in another terminal and
+the draft appears in the open tab.
+
+```bash
+beacon ui
+```
+
+The page is served from `127.0.0.1` only and every data request carries a
+per-session token, so nothing on the network — and no other website in your
+browser — can reach your drafts. The terminal and the browser share one queue;
+approve in either.
+
+## beacon serve
+
+The local API behind `beacon ui`, headless. Prints the routes and the session
+token — for scripting the queue or building your own client.
+
+```bash
+beacon serve
+beacon serve --port 4000   # default is 2322
+```
 
 ## beacon config set
 

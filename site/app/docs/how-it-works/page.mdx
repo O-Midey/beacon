@@ -22,4 +22,4 @@ One LLM call produces drafts for every enabled platform, shaped by your name, bi
 
 ## 5 · Queue
 
-Drafts persist atomically to `~/.beacon/queue.json`, capped at 50 entries. They wait there until you run `beacon review`.
+Drafts persist atomically to `~/.beacon/queue.json`, capped at 50 entries. They wait there until you run `beacon review` in the terminal — or `beacon ui` in the browser. Both share the same queue; writes are serialized through a cross-process lock, so the git hook and a review session can never lose each other's work.

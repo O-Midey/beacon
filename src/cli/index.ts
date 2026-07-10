@@ -8,6 +8,8 @@ import { initCommand } from "./commands/init.js";
 import { installCommand } from "./commands/install.js";
 import { reviewCommand } from "./commands/review.js";
 import { runCommand } from "./commands/run.js";
+import { DEFAULT_PORT, serveCommand } from "./commands/serve.js";
+import { uiCommand } from "./commands/ui.js";
 
 /**
  * Beacon CLI entry point. Commander wires subcommands to their handlers; each
@@ -60,6 +62,32 @@ program
   .description("Interactively review pending drafts.")
   .action(async () => {
     await runInteractiveAsync(() => reviewCommand());
+  });
+
+program
+  .command("serve")
+  .description("Start the local review API on 127.0.0.1 (powers the Beacon UI).")
+  .option("-p, --port <port>", `Port to listen on (default ${DEFAULT_PORT}).`)
+  .action(async (opts: { port?: string }) => {
+    await runInteractiveAsync(() =>
+      serveCommand({
+        version: VERSION,
+        ...(opts.port !== undefined ? { port: Number(opts.port) } : {}),
+      }),
+    );
+  });
+
+program
+  .command("ui")
+  .description("Open the review UI in your browser (attaches to a running serve, or starts one).")
+  .option("-p, --port <port>", `Port to listen on when starting fresh (default ${DEFAULT_PORT}).`)
+  .action(async (opts: { port?: string }) => {
+    await runInteractiveAsync(() =>
+      uiCommand({
+        version: VERSION,
+        ...(opts.port !== undefined ? { port: Number(opts.port) } : {}),
+      }),
+    );
   });
 
 program

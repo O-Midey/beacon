@@ -29,7 +29,8 @@ beacon init
 `beacon init` walks you through provider, key, voice, and language, installs the git hook, and drafts from your latest commit — you see real output before setup ends. Then just commit as usual.
 
 ```bash
-beacon review   # review, edit, approve or discard pending drafts
+beacon review   # review, edit, approve or discard pending drafts — in the terminal
+beacon ui       # the same review queue, in your browser
 beacon doctor   # diagnose your setup if anything misbehaves
 ```
 
@@ -86,8 +87,11 @@ beacon install
 
 # …commit as usual; Beacon drafts in the background and logs to ~/.beacon/beacon.log
 
-# Review pending drafts interactively
+# Review pending drafts interactively (terminal)
 beacon review
+
+# Review pending drafts in the browser (localhost only)
+beacon ui
 
 # Manually draft from the latest commit, a custom message, or a file
 beacon draft
@@ -109,6 +113,32 @@ In `beacon review`, each pending entry shows its significance score and every dr
 - **edit** — opens `$EDITOR` on one platform's draft as **plain text** (never JSON), validated on save
 - **discard** — removes the entry from the queue
 - **skip** — leaves it for later
+
+### Review in the browser
+
+```bash
+beacon ui
+```
+
+`beacon ui` opens the same queue as a local web page: platform drafts side by
+side, inline editing, copy-to-clipboard, live updates as new commits draft in
+the background. The terminal and the browser share one queue — approve in
+either, both see it.
+
+It stays as local as everything else:
+
+- The server binds to `127.0.0.1` only and every data request needs a
+  **per-session token** — a random page on the internet cannot read your
+  drafts through your own browser (CSRF/DNS-rebinding is blocked by a
+  host-header allowlist on top of the token).
+- The token travels in the URL *fragment*, which browsers never send over the
+  network.
+- Close the tab, `Ctrl-C` the process, and nothing is left running. No
+  telemetry, no external requests — the page's Content-Security-Policy
+  forbids them outright.
+
+`beacon serve` runs the same server headless (prints the API routes and token)
+if you want to build your own client on top.
 
 ---
 
@@ -169,12 +199,14 @@ npm link            # exposes `beacon` globally from your working copy
 
 ```text
 src/
-  cli/         Commander entry point + commands (init, doctor, run, install, review, draft, config)
+  cli/         Commander entry point + commands (init, doctor, run, install, review, ui, serve, draft, config)
   pipeline/    The five stages + a thin orchestrator (index.ts)
   platforms/   Per-platform prompt config + output schema (add a platform = add one file)
-  lib/         Git, config, LLM providers (llm/: anthropic + openai), edit round-trip, formatting, paths, logger
+  server/      Local review API: routes, SSE, static UI serving, session token, serve.json state
+  ui/          The browser review UI — vanilla TS, zero deps, built to dist/ui (brand: design/ROADMAP.md)
+  lib/         Git, config, LLM providers (llm/: anthropic + openai), edit round-trip, formatting, lock, paths, logger
   types/       All shared types + Zod schemas + BeaconError
-tests/         Vitest specs (safety, git, queue, significance, drafter, edit, compat)
+tests/         Vitest specs (safety, git, queue, significance, drafter, edit, server, lock, compat)
 hooks/         post-commit template
 ```
 
@@ -185,6 +217,8 @@ hooks/         post-commit template
 - The safety scanner always runs **before** any LLM call — the model never sees the raw diff.
 - A critical finding (e.g. a leaked `sk-ant-…` key) aborts drafting and logs which lines triggered it.
 - API keys live only on your machine — env var or a `0600` config file, never in code.
+- The `beacon ui` server is loopback-only and token-authenticated per session; the web page ships a strict self-only Content-Security-Policy, so nothing it renders can call out.
+- Concurrent writers (the git hook, `beacon review`, `beacon ui`) serialize queue writes through a cross-process file lock — no lost drafts, no corrupt queue.
 
 ---
 

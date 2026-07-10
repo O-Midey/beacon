@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **`beacon ui`** — review the queue in the browser: platform drafts side by
+  side, inline editing, copy to clipboard, approve/discard, and live updates
+  over SSE as new commits draft. Localhost-only with per-session token auth, a
+  host-header allowlist against DNS rebinding, and a strict self-only
+  Content-Security-Policy. Attaches to a running `beacon serve` instead of
+  starting a second instance.
+- **`beacon serve`** — the local review API behind the UI, runnable headless:
+  `GET /queue`, `POST /entries/:id/approve|discard`,
+  `PATCH /entries/:id/drafts`, `GET /events` (SSE), `GET /health`.
+- **Cross-process queue lock** — the git hook, `beacon review`, and the local
+  API now serialize queue writes through an advisory file lock
+  (`~/.beacon/queue.lock`), so concurrent writers can no longer lose each
+  other's updates. Stale locks from crashed processes are detected and
+  reclaimed automatically.
+
 ## [0.4.0] - 2026-07-10
 
 ### Changed
