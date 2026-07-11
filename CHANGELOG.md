@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-11
+
 ### Added
 
 - **`beacon ui`** — review the queue in the browser: platform drafts side by
