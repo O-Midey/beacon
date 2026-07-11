@@ -1,6 +1,6 @@
 {
   "name": "beacon-bip",
-  "version": "0.3.1",
+  "version": "0.5.0",
   "description": "Beacon — a local CLI that watches your git workspace and auto-drafts build-in-public content for Twitter/X, LinkedIn, and dev.to.",
   "type": "module",
   "bin": {
@@ -18,10 +18,10 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p src/ui --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && tsc -p src/ui --noEmit",
     "prepare": "tsup",
     "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
@@ -30,9 +30,12 @@
     "cli",
     "content",
     "git-hook",
-    "anthropic"
+    "llm",
+    "anthropic",
+    "openai",
+    "ollama"
   ],
-  "author": "Mide (omotosho.xyz)",
+  "author": "Omotosho (omotosho.xyz)",
   "license": "MIT",
   "homepage": "https://github.com/O-Midey/beacon#readme",
   "repository": {
@@ -43,8 +46,7 @@
     "url": "https://github.com/O-Midey/beacon/issues"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
-    "@inquirer/prompts": "^7.2.1",
+    "@clack/prompts": "^1.7.0",
     "clipboardy": "^4.0.0",
     "commander": "^12.1.0",
     "nanoid": "^5.0.9",

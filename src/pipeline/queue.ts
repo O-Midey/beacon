@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { nanoid } from "nanoid";
 import {
   BeaconError,
@@ -11,7 +11,16 @@ import {
   type SignificanceResult,
   type WorkspaceSnapshot,
 } from "../types/index.js";
-import { beaconHome, queuePath, queueTmpPath } from "../lib/paths.js";
+import { withFileLock } from "../lib/lock.js";
+import { CURRENT_QUEUE_VERSION, migrateQueue } from "./queue-migrations.js";
+import {
+  ensureBeaconHome,
+  FILE_MODE,
+  queueBackupPath,
+  queueLockPath,
+  queuePath,
+  queueTmpPath,
+} from "../lib/paths.js";
 
 /**
  * Stage 5 — Queue.
@@ -20,24 +29,37 @@ import { beaconHome, queuePath, queueTmpPath } from "../lib/paths.js";
  * then rename) so a crash mid-write cannot corrupt the queue. Newest entries are
  * prepended; the queue is capped at MAX_ENTRIES by evicting the oldest
  * already-discarded entries first.
+ *
+ * The persisted snapshot always carries the REDACTED diff, never the raw one:
+ * `warning`-severity findings (an `.env` assignment, a long token near a
+ * keyword) are hidden from the LLM but do not block drafting, so a raw snapshot
+ * would write the very secret the scanner just caught to disk in plaintext.
+ * Nothing downstream reads the diff back, so there is nothing to lose.
  */
 
 export const MAX_ENTRIES = 50;
-const EMPTY_QUEUE: Queue = { version: 1, entries: [] };
+const EMPTY_QUEUE: Queue = { version: CURRENT_QUEUE_VERSION, entries: [] };
 
-function ensureHome(): void {
-  const home = beaconHome();
-  if (!existsSync(home)) mkdirSync(home, { recursive: true, mode: 0o700 });
-}
-
-/** Load and validate the queue. A missing file yields an empty queue. */
+/**
+ * Load and validate the queue. A missing file yields an empty queue.
+ *
+ * The version is resolved *before* the schema is applied, so a queue written by
+ * an older Beacon is migrated rather than rejected, and one written by a newer
+ * Beacon says so rather than claiming the data is corrupt.
+ *
+ * A migration writes a backup of the original bytes but does not rewrite
+ * `queue.json` itself: loading is a read, and the next `saveQueue` — which runs
+ * under the queue lock — persists the new shape.
+ */
 export function loadQueue(): Queue {
   const path = queuePath();
   if (!existsSync(path)) return structuredClone(EMPTY_QUEUE);
 
+  const original = readFileSync(path, "utf8");
+
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(path, "utf8"));
+    raw = JSON.parse(original);
   } catch (err) {
     throw new BeaconError("Queue file is not valid JSON", "QUEUE_CORRUPT", {
       path,
@@ -45,7 +67,10 @@ export function loadQueue(): Queue {
     });
   }
 
-  const parsed = QueueSchema.safeParse(raw);
+  const { queue, migratedFrom } = migrateQueue(raw, path);
+  if (migratedFrom !== null) backupQueue(original, migratedFrom);
+
+  const parsed = QueueSchema.safeParse(queue);
   if (!parsed.success) {
     throw new BeaconError("Queue file failed validation", "QUEUE_CORRUPT", {
       path,
@@ -55,14 +80,33 @@ export function loadQueue(): Queue {
   return parsed.data;
 }
 
-/** Atomically write the queue to disk. */
+/**
+ * Preserve the pre-migration bytes exactly once. Never overwrites an existing
+ * backup: the first copy is the one taken before anything touched the file, and
+ * that is the copy worth keeping.
+ *
+ * Exported for testing. `loadQueue` cannot exercise this end-to-end until a
+ * real migration exists, because `QueueSchema` validates the *current* shape
+ * and would reject a synthetic future one immediately after migrating it.
+ */
+export function backupQueue(original: string, fromVersion: number): void {
+  const backup = queueBackupPath(fromVersion);
+  if (existsSync(backup)) return;
+  ensureBeaconHome();
+  writeFileSync(backup, original, { encoding: "utf8", mode: FILE_MODE });
+}
+
+/** Atomically write the queue to disk, owner-readable only. */
 export function saveQueue(queue: Queue): void {
-  ensureHome();
+  ensureBeaconHome();
   const tmp = queueTmpPath();
   // Validate before persisting so we never write a malformed queue.
   const validated = QueueSchema.parse(queue);
-  writeFileSync(tmp, JSON.stringify(validated, null, 2), "utf8");
+  writeFileSync(tmp, JSON.stringify(validated, null, 2), { encoding: "utf8", mode: FILE_MODE });
   renameSync(tmp, queuePath());
+  // `mode` is masked by the umask and ignored when the tmp file already exists;
+  // re-assert so an existing 0644 queue is repaired on the next write.
+  chmodSync(queuePath(), FILE_MODE);
 }
 
 /**
@@ -87,6 +131,29 @@ export function enforceCap(entries: QueueEntry[], max: number = MAX_ENTRIES): Qu
   return keep;
 }
 
+/**
+ * Replace every LLM- and disk-visible field with its redacted counterpart.
+ * Pure, and idempotent: re-applying it to an already-redacted snapshot is a
+ * no-op, which is what lets the pipeline redact once up front and the queue
+ * writer re-assert it as defence in depth.
+ *
+ * `redactedCommitMessage` is absent on results produced before message
+ * scanning existed; leaving the message untouched then is correct, because it
+ * was never scanned rather than scanned-and-found-clean.
+ */
+export function redactSnapshot(
+  snapshot: WorkspaceSnapshot,
+  safety: SafetyScanResult,
+): WorkspaceSnapshot {
+  return {
+    ...snapshot,
+    diff: safety.redactedDiff,
+    ...(safety.redactedCommitMessage !== undefined
+      ? { commitMessage: safety.redactedCommitMessage }
+      : {}),
+  };
+}
+
 /** Build a fresh pending QueueEntry. Pure; takes all stage outputs. */
 export function buildEntry(input: {
   draftSet: DraftSet;
@@ -98,7 +165,7 @@ export function buildEntry(input: {
     id: nanoid(),
     status: "pending",
     draftSet: input.draftSet,
-    snapshot: input.snapshot,
+    snapshot: redactSnapshot(input.snapshot, input.safety),
     significance: input.significance,
     safety: input.safety,
     createdAt: new Date(),
@@ -108,23 +175,39 @@ export function buildEntry(input: {
 /** Prepend an entry (newest-first) and enforce the cap. Pure. */
 export function addEntry(queue: Queue, entry: QueueEntry): Queue {
   return {
-    version: 1,
+    version: CURRENT_QUEUE_VERSION,
     entries: enforceCap([entry, ...queue.entries]),
   };
 }
 
 /**
- * Load → prepend → cap → save. Returns the persisted entry id.
+ * Serialized read-modify-write. Every mutation of the persisted queue MUST go
+ * through here: the git hook, `beacon review`, and `beacon serve` can all
+ * write concurrently, and an unguarded load → save cycle silently drops
+ * whichever update loses the race (the atomic rename in `saveQueue` prevents
+ * corruption, not lost updates). Holds a cross-process file lock for the whole
+ * cycle and returns the queue as persisted.
  */
-export function enqueue(input: {
+export async function mutateQueue(mutate: (queue: Queue) => Queue): Promise<Queue> {
+  ensureBeaconHome();
+  return withFileLock(queueLockPath(), () => {
+    const next = mutate(loadQueue());
+    saveQueue(next);
+    return next;
+  });
+}
+
+/**
+ * Load → prepend → cap → save, under the queue lock. Returns the entry id.
+ */
+export async function enqueue(input: {
   draftSet: DraftSet;
   snapshot: WorkspaceSnapshot;
   significance: SignificanceResult;
   safety: SafetyScanResult;
-}): string {
+}): Promise<string> {
   const entry = buildEntry(input);
-  const queue = addEntry(loadQueue(), entry);
-  saveQueue(queue);
+  await mutateQueue((queue) => addEntry(queue, entry));
   return entry.id;
 }
 
@@ -140,13 +223,13 @@ export function setEntryStatus(
       ? { ...e, status, ...(status === "pending" ? {} : { reviewedAt }) }
       : e,
   );
-  return { version: 1, entries };
+  return { version: CURRENT_QUEUE_VERSION, entries };
 }
 
 /** Replace an entry's draftSet (used after an in-place edit). Pure. */
 export function updateDraftSet(queue: Queue, id: string, draftSet: DraftSet): Queue {
   const entries = queue.entries.map((e) => (e.id === id ? { ...e, draftSet } : e));
-  return { version: 1, entries };
+  return { version: CURRENT_QUEUE_VERSION, entries };
 }
 
 /** Convenience selector. */

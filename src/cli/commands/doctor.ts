@@ -4,8 +4,12 @@ import { resolve } from "node:path";
 import { c } from "../../lib/colors.js";
 import { hasApiKey, loadConfig } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
+import { DEFAULT_BASE_URL } from "../../lib/llm/endpoints.js";
 import { pingProvider } from "../../lib/llm/index.js";
+import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
+import { inspectRepoConfig, type RepoConfigStatus } from "../../lib/repo-config.js";
 import { startSpinner } from "../../lib/spinner.js";
+import { banner } from "../../lib/ui.js";
 import { isBeaconError, type BeaconConfig } from "../../types/index.js";
 
 /**
@@ -59,12 +63,10 @@ export function configChecks(config: BeaconConfig, keyPresent: boolean): Check[]
   });
   checks.push({ level: "ok", label: `Model: ${config.model}` });
 
-  if (config.provider === "openai") {
-    checks.push({
-      level: "ok",
-      label: `Base URL: ${config.baseUrl ?? "https://api.openai.com/v1 (default)"}`,
-    });
-  }
+  checks.push({
+    level: "ok",
+    label: `Base URL: ${config.baseUrl ?? `${DEFAULT_BASE_URL[config.provider]} (default)`}`,
+  });
 
   checks.push(
     keyPresent
@@ -134,9 +136,48 @@ function checkBeaconOnPath(): Check {
   }
 }
 
-export async function doctorCommand(): Promise<void> {
-  logger.plain(c.bold("\n  Beacon doctor\n"));
+/**
+ * Which config layers are in effect here. The interesting case is a
+ * `.beacon.json` that exists but is untrusted: everything looks configured, yet
+ * none of the repo's settings apply. Breaking that silence is doctor's job.
+ */
+export function checkRepoConfig(): Check {
+  let status: RepoConfigStatus;
+  try {
+    status = inspectRepoConfig();
+  } catch (err) {
+    return {
+      level: "fail",
+      label: `${REPO_CONFIG_FILENAME} could not be read`,
+      hint: isBeaconError(err) ? err.message : String(err),
+    };
+  }
 
+  switch (status.kind) {
+    case "not-a-repo":
+      return { level: "ok", label: "Config: global only (not inside a git repository)" };
+    case "none":
+      return { level: "ok", label: `Config: global only (no ${REPO_CONFIG_FILENAME} here)` };
+    case "untrusted":
+      return {
+        level: "warn",
+        label: `${REPO_CONFIG_FILENAME} present but untrusted — its settings are ignored`,
+        hint: `Run \`beacon trust\` to review and approve it: ${status.path}`,
+      };
+    case "trusted":
+      return {
+        level: "ok",
+        label: `Config: global + trusted ${REPO_CONFIG_FILENAME}`,
+        hint: status.path,
+      };
+  }
+}
+
+export async function doctorCommand(): Promise<void> {
+  banner("doctor");
+
+  // The global config drives the provider ping: a repo may never set the
+  // provider, model, key, or base URL, so there is nothing to overlay here.
   const config = loadConfig();
   const keyPresent = hasApiKey(config);
 
@@ -144,26 +185,30 @@ export async function doctorCommand(): Promise<void> {
     checkNode(),
     checkGit(),
     ...configChecks(config, keyPresent),
+    checkRepoConfig(),
     checkHook(),
     checkBeaconOnPath(),
   ];
   for (const check of checks) print(check);
 
-  // Live ping only if a key is present.
+  // Live ping only if a key is present. Its result joins `checks` so a failed
+  // ping actually sinks the summary and the exit code.
   if (keyPresent) {
     const spinner = startSpinner(`Pinging ${config.provider}…`);
+    let ping: Check;
     try {
       await pingProvider(config);
-      spinner.stop();
-      print({ level: "ok", label: `${config.provider} responded to a test request` });
+      ping = { level: "ok", label: `${config.provider} responded to a test request` };
     } catch (err) {
-      spinner.stop();
-      print({
+      ping = {
         level: "fail",
         label: `${config.provider} ping failed`,
         hint: isBeaconError(err) ? err.message : String(err),
-      });
+      };
     }
+    spinner.stop();
+    checks.push(ping);
+    print(ping);
   }
 
   const failed = checks.some((ch) => ch.level === "fail");

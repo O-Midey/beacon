@@ -120,6 +120,33 @@ function hasPriorCommit(run: GitRunner): boolean {
 }
 
 /**
+ * Absolute path to the repository root, or `null` outside a work tree.
+ *
+ * `run` is injectable purely for testing; production code uses the default.
+ */
+export function repoRoot(run: GitRunner = defaultRunner): string | null {
+  try {
+    const root = run(["rev-parse", "--show-toplevel"]).trim();
+    return root === "" ? null : root;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The repository's name, as the drafts will call it.
+ *
+ * Derived from the repo root rather than the working directory: a hook fired
+ * from a subdirectory would otherwise name the subdirectory, and that name is
+ * sent to the model and lands in the published post ("Repo: pipeline"). Falls
+ * back to the cwd only when git cannot answer — which the callers have already
+ * ruled out via `isGitRepo`.
+ */
+function resolveRepoName(run: GitRunner): string {
+  return basename(repoRoot(run) ?? process.cwd());
+}
+
+/**
  * Capture a typed snapshot of the most recent commit. When there is no prior
  * commit (the very first commit in a repo) we diff the staged tree against the
  * empty tree instead of HEAD~1.
@@ -163,7 +190,7 @@ export function getSnapshot(
     insertions,
     deletions,
     timestamp: new Date(),
-    repoName: basename(process.cwd()),
+    repoName: resolveRepoName(run),
   };
 }
 
@@ -239,6 +266,6 @@ export function getRangeSnapshot(
     insertions,
     deletions,
     timestamp: new Date(),
-    repoName: basename(process.cwd()),
+    repoName: resolveRepoName(run),
   };
 }

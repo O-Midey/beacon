@@ -1,0 +1,78 @@
+name: Release
+
+# Publishes to npm with provenance: a signed, verifiable link between the
+# tarball on the registry and the exact commit and workflow run that produced
+# it. Beacon installs a git hook, reads private diffs, and holds an API key —
+# users deserve to check that what they install is what is in this repository.
+#
+# Requires:
+#   - `id-token: write`, so the runner can mint the OIDC token Sigstore signs.
+#   - A `repository` field in package.json (npm refuses provenance without it).
+#   - An npm **Automation** access token in the NPM_TOKEN repository secret.
+#   - A public repository.
+#
+# Third-party actions are pinned by commit SHA, not tag: a tag is mutable and a
+# compromised upstream could retag it at any point in this workflow's life.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # Consider binding this job to a protected GitHub Environment with required
+    # reviewers once one exists, so a publish cannot happen unattended.
+
+    permissions:
+      contents: read
+      id-token: write # required for provenance
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: npm ci
+
+      # A tag that disagrees with package.json publishes a version nobody asked
+      # for, under a git ref that does not describe it. Fail before that lands
+      # on the registry, where it cannot be taken back.
+      - name: Verify tag matches package.json version
+        if: github.event_name == 'release'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+          echo "tag and package.json agree on $pkg"
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      # `prepublishOnly` re-runs typecheck, test, and build. That is deliberate
+      # redundancy: it also protects a publish run from a developer's laptop.
+      - name: Publish with provenance
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

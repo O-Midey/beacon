@@ -1,5 +1,6 @@
 import { BeaconError, type BeaconConfig } from "../../types/index.js";
 import { resolveApiKey } from "../config.js";
+import { resolveBaseUrl } from "./endpoints.js";
 import { classifyLlmError } from "./errors.js";
 import type { CompletionParams, LlmProvider } from "./types.js";
 
@@ -9,8 +10,6 @@ import type { CompletionParams, LlmProvider } from "./types.js";
  * Works with OpenAI and any compatible endpoint (OpenRouter, Groq, Together,
  * a local server, …) via the configurable `baseUrl`. No SDK dependency.
  */
-
-const DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
 type FetchFn = typeof fetch;
 
@@ -30,7 +29,7 @@ export class OpenAiProvider implements LlmProvider {
     this.config = config;
     this.apiKey = resolveApiKey(config);
     this.model = config.model;
-    this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.baseUrl = resolveBaseUrl(config);
     this.fetchImpl = fetchImpl;
   }
 

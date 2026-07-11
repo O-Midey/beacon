@@ -1,19 +1,28 @@
 import { execFileSync } from "node:child_process";
-import { confirm, input, password, select } from "@inquirer/prompts";
+import { homedir } from "node:os";
 import { c } from "../../lib/colors.js";
-import { loadConfig, maskKey, saveConfig } from "../../lib/config.js";
-import { logger } from "../../lib/logger.js";
+import { apiKeySource, loadConfig, maskKey, saveConfig } from "../../lib/config.js";
+import { listOllamaModels } from "../../lib/ollama.js";
+import { configPath } from "../../lib/paths.js";
+import { confirm, intro, log, note, outro, password, select, spinner, text } from "../../lib/prompts.js";
 import { pingProvider } from "../../lib/llm/index.js";
-import { startSpinner } from "../../lib/spinner.js";
-import { isBeaconError, type ProviderName } from "../../types/index.js";
+import { keyValueLines } from "../../lib/ui.js";
+import { isBeaconError, type BeaconConfig, type ProviderName } from "../../types/index.js";
 import { draftCommand } from "./draft.js";
 import { installCommand } from "./install.js";
 
 /**
- * `beacon init` — guided first-run setup. Walks the user through provider, key,
- * model, voice, and language; offers to validate the key with a live ping, to
- * install the git hook, and to draft from the latest commit immediately so the
- * first session ends with real output.
+ * `beacon init` — guided first-run setup, deliberately two-tier:
+ *
+ *  1. Essentials — provider and key, the only things Beacon cannot run
+ *     without. Everything else defaults sensibly.
+ *  2. An optional personalization pass (bio, voice, language) behind a single
+ *     gate, all editable later via `beacon config set`.
+ *
+ * Then a connection test with a fix-it loop, the git hook, and a draft from
+ * the latest commit — the first session ends with real output, not just
+ * config. Tuning knobs like the significance threshold are *not* asked here:
+ * nobody knows what they want before seeing drafts.
  */
 
 /** Setup choices: real providers plus presets that map onto them. */
@@ -45,112 +54,257 @@ function inGitRepo(): boolean {
   }
 }
 
+/** What the stored config maps to in the provider picker. Exported for testing. */
+export function currentChoice(config: BeaconConfig): ProviderChoice {
+  if (config.provider === "openai" && config.baseUrl?.includes(":11434")) return "ollama";
+  return config.provider;
+}
+
+/**
+ * The model to carry into a (re-)init: keep a stored model only when the
+ * provider did not change — a `gpt-4o-mini` left over from an OpenAI setup
+ * must never survive a switch to Anthropic. Exported for testing.
+ */
+export function defaultModel(
+  config: BeaconConfig,
+  previous: ProviderChoice,
+  choice: ProviderChoice,
+): string {
+  if (choice === previous && config.model.trim()) return config.model;
+  return DEFAULT_MODEL[choice];
+}
+
+async function promptApiKey(provider: ProviderName): Promise<string> {
+  const key = await password({
+    message: `${provider === "anthropic" ? "Anthropic" : "OpenAI-compatible"} API key ${c.dim("(stored at ~/.beacon/config.json, 0600)")}`,
+    mask: "•",
+    validate: (v) => (v?.trim() ? undefined : "An API key is required."),
+  });
+  return key.trim();
+}
+
+/** Configure the Ollama preset: detect the daemon and offer its models. */
+async function setupOllama(config: BeaconConfig, previous: ProviderChoice): Promise<void> {
+  config.provider = "openai";
+  // Ollama speaks the OpenAI protocol and ignores the key, but the client
+  // requires a non-empty one.
+  config.apiKey = "ollama";
+
+  const stored = config.baseUrl?.includes(":11434") ? config.baseUrl : undefined;
+  const detect = spinner();
+  detect.start("Looking for a running Ollama…");
+
+  let baseUrl = stored ?? OLLAMA_BASE_URL;
+  let models = await listOllamaModels(baseUrl);
+  if (models === null && baseUrl !== OLLAMA_BASE_URL) {
+    baseUrl = OLLAMA_BASE_URL;
+    models = await listOllamaModels(baseUrl);
+  }
+
+  if (models !== null && models.length > 0) {
+    detect.stop(`Found Ollama at ${c.accent(baseUrl)} ${c.dim(`(${models.length} model${models.length === 1 ? "" : "s"})`)}`);
+    config.baseUrl = baseUrl;
+    const preferred = defaultModel(config, previous, "ollama");
+    config.model = await select<string>({
+      message: "Which model?",
+      options: models.map((name) => ({ value: name })),
+      initialValue: models.includes(preferred)
+        ? preferred
+        : (models.find((m) => m.startsWith(DEFAULT_MODEL.ollama)) ?? models[0]!),
+    });
+  } else {
+    detect.stop(c.warn("Ollama isn't reachable — configuring manually."));
+    log.info(`Start it with ${c.code("ollama serve")}; drafting needs it running.`);
+    config.baseUrl = (
+      await text({ message: "Ollama base URL", initialValue: baseUrl, defaultValue: OLLAMA_BASE_URL })
+    ).trim();
+    config.model = (
+      await text({
+        message: "Model",
+        initialValue: defaultModel(config, previous, "ollama"),
+        defaultValue: DEFAULT_MODEL.ollama,
+      })
+    ).trim();
+  }
+
+  log.message(c.dim("No API key needed — everything stays on your machine."));
+}
+
+/** Configure Anthropic or an OpenAI-compatible endpoint. */
+async function setupProvider(
+  config: BeaconConfig,
+  previous: ProviderChoice,
+  choice: ProviderName,
+): Promise<void> {
+  config.provider = choice;
+
+  const envVar = ENV_VAR[choice];
+  if (process.env[envVar]?.trim()) {
+    log.success(`Found ${c.accent(envVar)} in your environment — Beacon will use it.`);
+  } else {
+    config.apiKey = await promptApiKey(choice);
+  }
+
+  if (choice === "openai") {
+    config.baseUrl = (
+      await text({
+        message: "Base URL",
+        initialValue: config.baseUrl ?? "https://api.openai.com/v1",
+        defaultValue: "https://api.openai.com/v1",
+      })
+    ).trim();
+    // The endpoint decides which model names exist, so this one is essential.
+    config.model = (
+      await text({
+        message: "Model",
+        initialValue: defaultModel(config, previous, choice),
+        defaultValue: DEFAULT_MODEL.openai,
+      })
+    ).trim();
+  } else {
+    // Anthropic model ids are stable — default silently, change any time with
+    // `beacon config set model`.
+    config.model = defaultModel(config, previous, choice);
+  }
+}
+
+/** The optional voice pass, behind one gate so the fast path stays fast. */
+async function personalize(config: BeaconConfig): Promise<void> {
+  const wants = await confirm({
+    message: `Personalize your voice now? ${c.dim("(bio, tone, language — editable any time)")}`,
+    initialValue: true,
+  });
+  if (!wants) return;
+
+  const bio = await text({
+    message: "How should posts describe you?",
+    placeholder: 'e.g. "a fullstack engineer building devtools"',
+    initialValue: config.authorBio ?? "",
+  });
+  if (bio.trim()) config.authorBio = bio.trim();
+
+  const notes = await text({
+    message: `Voice notes ${c.dim("(tone, phrases to avoid — optional)")}`,
+    initialValue: config.authorNotes ?? "",
+  });
+  if (notes.trim()) config.authorNotes = notes.trim();
+
+  const language = await text({
+    message: "Draft language",
+    initialValue: config.language,
+    defaultValue: config.language,
+  });
+  if (language.trim()) config.language = language.trim();
+}
+
+/**
+ * Live-ping the provider with a fix-it loop: a failed test offers to re-enter
+ * the key or retry instead of marching on with a broken setup.
+ */
+async function testConnection(config: BeaconConfig, choice: ProviderChoice): Promise<void> {
+  if (!(await confirm({ message: "Test the connection now?", initialValue: true }))) return;
+
+  for (;;) {
+    const ping = spinner();
+    ping.start(`Pinging ${config.provider === "anthropic" ? "Anthropic" : config.baseUrl ?? "the provider"}…`);
+    try {
+      await pingProvider(config);
+      ping.stop(c.success("Connection works."));
+      return;
+    } catch (err) {
+      ping.error(c.error("Connection failed."));
+      if (isBeaconError(err)) log.message(c.dim(err.message));
+    }
+
+    // A stored key can be re-entered here; a key coming from an env var cannot
+    // (`resolveApiKey` prefers the env var, so a new config key would be
+    // ignored on the next ping). Offer rekey only when it can actually help,
+    // and name the env var otherwise so the user fixes it in the right place.
+    const source = choice !== "ollama" ? apiKeySource(config) : { source: "config" as const };
+    const canRekey = choice !== "ollama" && source.source !== "env";
+    if (source.source === "env") {
+      log.message(
+        c.dim(`The key comes from ${source.envVar} — fix it there; a config key won't override it.`),
+      );
+    }
+
+    const next = await select<"retry" | "rekey" | "continue">({
+      message: "What now?",
+      options: [
+        ...(canRekey ? [{ value: "rekey" as const, label: "Re-enter the API key" }] : []),
+        { value: "retry", label: "Retry" },
+        {
+          value: "continue",
+          label: "Continue anyway",
+          hint: "diagnose later with beacon doctor",
+        },
+      ],
+    });
+    if (next === "continue") return;
+    if (next === "rekey" && canRekey) {
+      config.apiKey = await promptApiKey(choice);
+      saveConfig(config);
+    }
+  }
+}
+
 export async function initCommand(): Promise<void> {
-  logger.plain(c.bold("\n  Beacon setup\n"));
+  intro();
 
   const config = loadConfig();
+  const previous = currentChoice(config);
 
   const choice = await select<ProviderChoice>({
     message: "Which LLM provider?",
-    default: config.provider,
-    choices: [
-      { name: "Anthropic (Claude)", value: "anthropic" },
-      { name: "OpenAI-compatible (OpenAI, OpenRouter, Groq, …)", value: "openai" },
-      { name: "Ollama (local model — free, fully offline)", value: "ollama" },
+    initialValue: previous,
+    options: [
+      { value: "anthropic", label: "Anthropic (Claude)", hint: "recommended" },
+      { value: "openai", label: "OpenAI-compatible", hint: "OpenAI, OpenRouter, Groq, …" },
+      { value: "ollama", label: "Ollama", hint: "local model — free, fully offline" },
     ],
   });
 
   if (choice === "ollama") {
-    // Ollama speaks the OpenAI protocol and ignores the key, but the client
-    // requires a non-empty one.
-    config.provider = "openai";
-    config.baseUrl = await input({ message: "Ollama base URL:", default: OLLAMA_BASE_URL });
-    config.apiKey = "ollama";
-    logger.plain(c.dim("No API key needed — everything stays on your machine."));
+    await setupOllama(config, previous);
   } else {
-    config.provider = choice;
-    const envVar = ENV_VAR[choice];
-    const envKey = process.env[envVar]?.trim();
-    if (envKey) {
-      logger.plain(c.dim(`Found ${envVar} in your environment — Beacon will use it.`));
-    } else {
-      const key = await password({
-        message: `${choice} API key (stored at ~/.beacon/config.json, 0600):`,
-        mask: "*",
-      });
-      config.apiKey = key.trim();
-    }
-    if (choice === "openai") {
-      config.baseUrl = await input({
-        message: "Base URL:",
-        default: config.baseUrl ?? "https://api.openai.com/v1",
-      });
-    }
+    await setupProvider(config, previous, choice);
   }
 
-  config.model = await input({
-    message: "Model:",
-    default:
-      config.model && config.model !== "claude-sonnet-4-6" ? config.model : DEFAULT_MODEL[choice],
-  });
-
-  const authorBio = await input({
-    message: 'How should posts describe you? (e.g. "a fullstack engineer building devtools"):',
-    default: config.authorBio ?? "",
-  });
-  if (authorBio.trim()) config.authorBio = authorBio.trim();
-
-  const notes = await input({
-    message: "Voice notes (optional — tone, phrases to avoid, etc.):",
-    default: config.authorNotes ?? "",
-  });
-  if (notes.trim()) config.authorNotes = notes.trim();
-
-  config.language = await input({
-    message: "Draft language:",
-    default: config.language,
-  });
-
-  const threshold = await input({
-    message: "Significance threshold (0–10, lower = more drafts):",
-    default: String(config.significanceThreshold),
-    validate: (v) => {
-      const n = Number(v);
-      return Number.isFinite(n) && n >= 0 && n <= 10 ? true : "Enter a number from 0 to 10";
-    },
-  });
-  config.significanceThreshold = Number(threshold);
+  await personalize(config);
 
   saveConfig(config);
-  logger.success(`Config saved (${c.dim(`key ${maskKey(config.apiKey)}`)}).`);
 
-  // Optional: validate the key with a live ping.
-  if (await confirm({ message: "Test the connection now?", default: true })) {
-    const spinner = startSpinner("Pinging the provider…");
-    try {
-      await pingProvider(config);
-      spinner.succeed(c.success("Connection works."));
-    } catch (err) {
-      spinner.fail(c.error("Connection failed."));
-      if (isBeaconError(err)) logger.plain(c.dim(err.message));
-    }
-  }
+  const envVar = choice !== "ollama" ? ENV_VAR[choice] : undefined;
+  const keyFromEnv = envVar !== undefined && Boolean(process.env[envVar]?.trim());
+  note(
+    keyValueLines([
+      ["provider", choice === "ollama" ? "Ollama (local)" : config.provider],
+      ["model", c.accent(config.model)],
+      ["api key", choice === "ollama" ? c.dim("not needed") : keyFromEnv ? `from ${envVar}` : maskKey(config.apiKey)],
+      ["language", config.language],
+      ["config", configPath().replace(homedir(), "~")],
+    ]).join("\n"),
+    "Saved",
+  );
+
+  await testConnection(config, choice);
 
   const inRepo = inGitRepo();
 
   // Optional: install the hook if we're in a repo.
-  if (inRepo && (await confirm({ message: "Install the post-commit hook in this repo?", default: true }))) {
+  if (inRepo && (await confirm({ message: "Install the post-commit hook in this repo?", initialValue: true }))) {
     installCommand();
   }
 
   // First-run draft moment: end setup with real output, not just config.
-  if (inRepo && (await confirm({ message: "Draft from your latest commit right now?", default: true }))) {
+  if (inRepo && (await confirm({ message: "Draft from your latest commit right now?", initialValue: true }))) {
     await draftCommand({});
-    logger.plain(`\n${c.bold("Done.")} Run ${c.code("beacon review")} to see your first draft.\n`);
+    outro(`Run ${c.code("beacon review")} to see your first draft.`);
     return;
   }
 
-  logger.plain(
-    `\n${c.bold("Done.")} Try ${c.code('beacon draft --message "what you just built"')} or commit something.\n`,
+  outro(
+    `Try ${c.code('beacon draft --message "what you just built"')} or just commit something.\n` +
+      c.dim(`   Drafts trigger at significance ≥ 6 — tune with \`beacon config set significance-threshold\`.`),
   );
 }

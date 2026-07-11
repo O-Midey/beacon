@@ -1,5 +1,7 @@
 import { Command } from "commander";
 import { logger } from "../lib/logger.js";
+import { PromptCancelled } from "../lib/prompts.js";
+import { VERSION } from "../lib/version.js";
 import { isBeaconError } from "../types/index.js";
 import { configSetCommand, configShowCommand } from "./commands/config.js";
 import { doctorCommand } from "./commands/doctor.js";
@@ -8,6 +10,9 @@ import { initCommand } from "./commands/init.js";
 import { installCommand } from "./commands/install.js";
 import { reviewCommand } from "./commands/review.js";
 import { runCommand } from "./commands/run.js";
+import { trustCommand } from "./commands/trust.js";
+import { DEFAULT_PORT, serveCommand } from "./commands/serve.js";
+import { uiCommand } from "./commands/ui.js";
 
 /**
  * Beacon CLI entry point. Commander wires subcommands to their handlers; each
@@ -15,9 +20,15 @@ import { runCommand } from "./commands/run.js";
  * friendly stderr messages; `run` swallows non-critical errors into the log.
  */
 
-// Replaced at build time by tsup `define`; falls back when run un-bundled.
-declare const __BEACON_VERSION__: string;
-const VERSION = typeof __BEACON_VERSION__ !== "undefined" ? __BEACON_VERSION__ : "0.0.0-dev";
+// A closed pipe (`beacon config show | head`) must end the process quietly,
+// not crash it with an unhandled stream error. Registered before anything
+// writes to stdout/stderr.
+function exitQuietlyOnEpipe(err: NodeJS.ErrnoException): void {
+  if (err.code === "EPIPE") process.exit(0);
+  throw err;
+}
+process.stdout.on("error", exitQuietlyOnEpipe);
+process.stderr.on("error", exitQuietlyOnEpipe);
 
 const program = new Command();
 
@@ -63,6 +74,43 @@ program
   });
 
 program
+  .command("trust")
+  .description("Review and approve this repository's .beacon.json (ignored until you do).")
+  .option("--revoke", "Forget this repository's approval; its .beacon.json stops applying.", false)
+  .option("-y, --yes", "Approve without the confirmation prompt.", false)
+  .action(async (opts: { revoke?: boolean; yes?: boolean }) => {
+    await runInteractiveAsync(() =>
+      trustCommand({ revoke: opts.revoke ?? false, yes: opts.yes ?? false }),
+    );
+  });
+
+program
+  .command("serve")
+  .description("Start the local review API on 127.0.0.1 (powers the Beacon UI).")
+  .option("-p, --port <port>", `Port to listen on (default ${DEFAULT_PORT}).`)
+  .action(async (opts: { port?: string }) => {
+    await runInteractiveAsync(() =>
+      serveCommand({
+        version: VERSION,
+        ...(opts.port !== undefined ? { port: Number(opts.port) } : {}),
+      }),
+    );
+  });
+
+program
+  .command("ui")
+  .description("Open the review UI in your browser (attaches to a running serve, or starts one).")
+  .option("-p, --port <port>", `Port to listen on when starting fresh (default ${DEFAULT_PORT}).`)
+  .action(async (opts: { port?: string }) => {
+    await runInteractiveAsync(() =>
+      uiCommand({
+        version: VERSION,
+        ...(opts.port !== undefined ? { port: Number(opts.port) } : {}),
+      }),
+    );
+  });
+
+program
   .command("draft")
   .description("Manually trigger a draft (from the latest commit, a message, a file, or a digest window).")
   .option("-m, --message <text>", "Override the commit-message context.")
@@ -96,8 +144,9 @@ config
 config
   .command("show")
   .description("Show current config (API key masked).")
-  .action(() => {
-    runInteractive(() => configShowCommand());
+  .option("--json", "Print the raw config as JSON (for scripts).", false)
+  .action((opts: { json?: boolean }) => {
+    runInteractive(() => configShowCommand({ json: opts.json ?? false }));
   });
 
 /** Wrap a sync interactive handler: friendly error to stderr, exit code 1. */
@@ -119,9 +168,8 @@ async function runInteractiveAsync(fn: () => Promise<void>): Promise<void> {
 }
 
 function reportInteractiveError(err: unknown): void {
-  // @inquirer throws this when the user hits Ctrl-C; treat as a clean exit.
-  if (err instanceof Error && err.name === "ExitPromptError") {
-    logger.info("Cancelled.");
+  // Ctrl-C at a prompt; lib/prompts.ts already printed the cancel line.
+  if (err instanceof PromptCancelled) {
     return;
   }
   if (isBeaconError(err)) {

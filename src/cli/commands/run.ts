@@ -1,6 +1,8 @@
 import { c } from "../../lib/colors.js";
-import { hasApiKey, loadConfig } from "../../lib/config.js";
+import { hasApiKey } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
+import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
+import { loadEffectiveConfig } from "../../lib/repo-config.js";
 import { startSpinner, type Spinner } from "../../lib/spinner.js";
 import { runPipeline, type PipelineStage } from "../../pipeline/index.js";
 import { isBeaconError } from "../../types/index.js";
@@ -28,7 +30,24 @@ export async function runCommand(options: RunOptions = {}): Promise<void> {
   const silent = options.silent ?? false;
 
   try {
-    const config = loadConfig();
+    const { config, repo } = loadEffectiveConfig();
+
+    // An untrusted `.beacon.json` is not an error — it simply does not apply.
+    // Say so once per run so the repo's author is not left wondering why.
+    if (repo.kind === "untrusted") {
+      const msg = `Beacon: ignoring untrusted ${REPO_CONFIG_FILENAME} — run \`beacon trust\` to apply it.`;
+      logger.file("warn", msg);
+      if (!silent) logger.warn(msg);
+    }
+
+    // Before the API-key check and before the pipeline: an opted-out repo must
+    // cost nothing — no LLM call, no latency, no spend.
+    if (!config.enabled) {
+      const msg = "Beacon: disabled for this repository — skipping.";
+      logger.file("info", msg);
+      if (!silent) logger.info(msg);
+      return;
+    }
 
     if (!hasApiKey(config)) {
       const msg = "Beacon: no API key configured — skipping. Run `beacon init`.";
@@ -53,7 +72,7 @@ export async function runCommand(options: RunOptions = {}): Promise<void> {
       }
       case "blocked_unsafe": {
         const criticals = outcome.safety.findings.filter((f) => f.severity === "critical");
-        const detail = criticals.map((f) => `${f.pattern} @ diff line ${f.line}`).join(", ");
+        const detail = criticals.map((f) => `${f.pattern} @ ${f.source} line ${f.line}`).join(", ");
         const msg = `Beacon: drafting blocked — critical safety findings: ${detail}`;
         logger.file("error", msg);
         spinner?.fail(c.error(msg));

@@ -47,9 +47,8 @@ export function classifyLlmError(input: ClassifyInput): BeaconError {
     message = `${config.provider} had a server error (${status}). This is usually transient — retry shortly.`;
   } else if (isNetwork) {
     code = "NETWORK_ERROR";
-    message = `Could not reach ${config.provider}. Check your internet connection${
-      config.provider === "openai" ? " and base-url" : ""
-    }.`;
+    // Both providers accept a baseUrl override, so it's always a suspect.
+    message = `Could not reach ${config.provider}. Check your internet connection and base-url.`;
   } else if (status !== undefined) {
     message = `${config.provider} returned an error (HTTP ${status}).`;
   }

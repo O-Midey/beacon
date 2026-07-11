@@ -1,22 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { BeaconError, BeaconConfigSchema, type BeaconConfig } from "../types/index.js";
-import { beaconHome, configPath } from "./paths.js";
+import { configPath, ensureBeaconHome, FILE_MODE } from "./paths.js";
 
 /**
  * Read/write `~/.beacon/config.json`. The file is written with mode 0600 so the
  * stored API key is not world-readable. All defaults live in the Zod schema, so
  * a partial or first-run file still parses into a complete config.
  */
-
-const FILE_MODE = 0o600;
-const DIR_MODE = 0o700;
-
-function ensureHome(): void {
-  const home = beaconHome();
-  if (!existsSync(home)) {
-    mkdirSync(home, { recursive: true, mode: DIR_MODE });
-  }
-}
 
 /**
  * Load config, applying schema defaults. Returns a fully-populated config even
@@ -48,7 +38,7 @@ export function loadConfig(): BeaconConfig {
 
 /** Atomically persist config with restrictive permissions. */
 export function saveConfig(config: BeaconConfig): void {
-  ensureHome();
+  ensureBeaconHome();
   const path = configPath();
   const tmp = `${path}.tmp`;
   const serialized = JSON.stringify(config, null, 2);
@@ -84,6 +74,19 @@ export function resolveApiKey(config: BeaconConfig): string {
 export function hasApiKey(config: BeaconConfig): boolean {
   const envName = PROVIDER_ENV[config.provider];
   return Boolean(process.env[envName]?.trim() || config.apiKey.trim());
+}
+
+/** Where the effective API key comes from, for display (`beacon config show`). */
+export type ApiKeySource =
+  | { source: "env"; envVar: string }
+  | { source: "config" }
+  | { source: "none" };
+
+export function apiKeySource(config: BeaconConfig): ApiKeySource {
+  const envVar = PROVIDER_ENV[config.provider];
+  if (process.env[envVar]?.trim()) return { source: "env", envVar };
+  if (config.apiKey.trim()) return { source: "config" };
+  return { source: "none" };
 }
 
 /** Mask a key for display, e.g. `sk-ant…f9a2`. */

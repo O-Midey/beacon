@@ -6,6 +6,111 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-07-11
+
+### Added
+
+- **`beacon ui`** — review the queue in the browser: platform drafts side by
+  side, inline editing, copy to clipboard, approve/discard, and live updates
+  over SSE as new commits draft. Localhost-only with per-session token auth, a
+  host-header allowlist against DNS rebinding, and a strict self-only
+  Content-Security-Policy. Attaches to a running `beacon serve` instead of
+  starting a second instance.
+- **`beacon serve`** — the local review API behind the UI, runnable headless:
+  `GET /queue`, `POST /entries/:id/approve|discard`,
+  `PATCH /entries/:id/drafts`, `GET /events` (SSE), `GET /health`.
+- **Cross-process queue lock** — the git hook, `beacon review`, and the local
+  API now serialize queue writes through an advisory file lock
+  (`~/.beacon/queue.lock`), so concurrent writers can no longer lose each
+  other's updates. Stale locks from crashed processes are detected and
+  reclaimed automatically.
+- **Per-repository config** — a `.beacon.json` at a repo root overrides the
+  global config for that repo (`enabled`, `platforms`, `significanceThreshold`,
+  `language`, `authorNotes`). It is ignored until you approve it with
+  **`beacon trust`**, which pins the file's SHA-256; editing the file lapses
+  that approval automatically. A repo config may never set `apiKey`, `baseUrl`,
+  `provider`, or `model`.
+- **`enabled: false`** — opt a repository out entirely. The hook becomes a
+  no-op ahead of any API call, so an opted-out repo costs nothing.
+- **`beacon doctor`** now reports which config layers are in effect and warns
+  when a `.beacon.json` is present but untrusted.
+- **npm provenance** — releases are published with a signed provenance
+  attestation linking the package to the commit and CI run that built it. CI
+  actions are pinned by commit SHA.
+- **[`SECURITY.md`](SECURITY.md)** — a written threat model: what leaves your
+  machine, what never does, and what the scanner does not protect against.
+- **Ollama auto-detection in `beacon init`** — picking Ollama now finds the
+  running daemon and offers your pulled models as a picker, instead of asking
+  you to type a base URL and a model name from memory.
+- **`beacon config show` is readable** — an aligned key/value view that says
+  which API key is actually in effect (and when an env var overrides the
+  stored one). The old raw-JSON output is still there behind `--json`.
+
+### Changed
+
+- **`beacon init` asks less** — setup now needs only the essentials (provider
+  and key); bio, voice notes, and language sit behind a single optional
+  "personalize now?" step, and the significance-threshold question is gone
+  (it defaults to 6 — tune it any time with
+  `beacon config set significance-threshold`). A failed connection test now
+  offers to re-enter the key or retry instead of marching on with a broken
+  setup.
+- **A branded terminal** — Beacon's yellow now runs through the whole CLI:
+  a `✦ beacon` wordmark opens each command, prompts render as one connected
+  flow, and `beacon review` shows each draft as a card with per-platform
+  character counts (flagged when a tweet runs past 280).
+
+### Fixed
+
+- **Secrets in the commit message reached the model.** The scanner only ever
+  saw the diff, while the commit message was sent verbatim to both LLM calls —
+  so `git commit -m "rotate sk-ant-…"` shipped the key to the provider. Both
+  surfaces are now scanned before either call.
+- **The repository was named after the working directory.** A commit from a
+  subdirectory told the model (and the drafted post) that the repo was called
+  `src`, or `pipeline`; it now uses the repository root.
+- **A queue from a newer Beacon reported as corrupt.** `queue.json` is now
+  versioned: an older file is migrated (after its bytes are copied aside), and
+  a newer one prompts you to upgrade rather than implying data loss.
+- **Re-running `beacon init` after switching providers suggested the old
+  provider's model.** Choosing Anthropic on a machine previously set up for
+  OpenAI offered `gpt-4o-mini` as the default; the suggested model now follows
+  the provider you just picked.
+- **Piping output could crash.** `beacon config show | head` (or any early-
+  closing reader) died with an unhandled `EPIPE` stack trace; a closed pipe now
+  ends the process quietly.
+
+### Security
+
+- **`queue.json` was world-readable and stored the raw diff.** A `warning`-level
+  finding (an `.env` assignment, a private IP) is redacted from the model but
+  does not block drafting, so the raw secret was written to a `0644` file.
+  `queue.json` is now `0600` and stores only the redacted snapshot; `~/.beacon`
+  and every file under it are owner-only, repaired on write.
+
+## [0.4.0] - 2026-07-10
+
+### Changed
+
+- **Leaner install** — the `anthropic` provider now calls the Messages API
+  directly instead of through `@anthropic-ai/sdk`. Beacon's LLM layer ships with
+  no runtime dependencies: seven packages fewer on every install (9.8 MB in the
+  SDK alone), and roughly 30 ms off CLI startup.
+- **`base-url` applies to every provider**, not just OpenAI-compatible ones —
+  point `anthropic` at a proxy or gateway with
+  `beacon config set base-url <url>`. `beacon doctor` now reports the base URL
+  whichever provider you use.
+
+### Fixed
+
+- `beacon doctor` exits non-zero when the live provider ping fails, as
+  documented. An invalid API key previously reported a healthy setup.
+
+### Removed
+
+- `ANTHROPIC_BASE_URL` is no longer read from the environment. Use
+  `beacon config set base-url <url>` instead.
+
 ## [0.3.1] - 2026-07-04
 
 ### Added
