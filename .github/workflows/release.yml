@@ -18,6 +18,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run the full pipeline but pass --dry-run to npm publish (no registry write)"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -72,7 +77,14 @@ jobs:
 
       # `prepublishOnly` re-runs typecheck, test, and build. That is deliberate
       # redundancy: it also protects a publish run from a developer's laptop.
+      #
+      # `inputs.dry_run` is only ever set on a manual `workflow_dispatch`; on a
+      # `release: published` event it is empty, so a real release always
+      # publishes for real. `--dry-run` builds and packs but never contacts the
+      # registry, so it does NOT exercise token auth or provenance signing —
+      # only a real publish does. It exists to prove the workflow itself runs
+      # green in CI before a release event depends on it.
       - name: Publish with provenance
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
