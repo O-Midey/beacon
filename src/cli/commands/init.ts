@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
+import { homedir } from "node:os";
 import { c } from "../../lib/colors.js";
-import { loadConfig, maskKey, saveConfig } from "../../lib/config.js";
+import { apiKeySource, loadConfig, maskKey, saveConfig } from "../../lib/config.js";
 import { listOllamaModels } from "../../lib/ollama.js";
+import { configPath } from "../../lib/paths.js";
 import { confirm, intro, log, note, outro, password, select, spinner, text } from "../../lib/prompts.js";
 import { pingProvider } from "../../lib/llm/index.js";
 import { keyValueLines } from "../../lib/ui.js";
@@ -214,12 +216,22 @@ async function testConnection(config: BeaconConfig, choice: ProviderChoice): Pro
       if (isBeaconError(err)) log.message(c.dim(err.message));
     }
 
+    // A stored key can be re-entered here; a key coming from an env var cannot
+    // (`resolveApiKey` prefers the env var, so a new config key would be
+    // ignored on the next ping). Offer rekey only when it can actually help,
+    // and name the env var otherwise so the user fixes it in the right place.
+    const source = choice !== "ollama" ? apiKeySource(config) : { source: "config" as const };
+    const canRekey = choice !== "ollama" && source.source !== "env";
+    if (source.source === "env") {
+      log.message(
+        c.dim(`The key comes from ${source.envVar} — fix it there; a config key won't override it.`),
+      );
+    }
+
     const next = await select<"retry" | "rekey" | "continue">({
       message: "What now?",
       options: [
-        ...(choice !== "ollama"
-          ? [{ value: "rekey" as const, label: "Re-enter the API key" }]
-          : []),
+        ...(canRekey ? [{ value: "rekey" as const, label: "Re-enter the API key" }] : []),
         { value: "retry", label: "Retry" },
         {
           value: "continue",
@@ -229,7 +241,7 @@ async function testConnection(config: BeaconConfig, choice: ProviderChoice): Pro
       ],
     });
     if (next === "continue") return;
-    if (next === "rekey" && choice !== "ollama") {
+    if (next === "rekey" && canRekey) {
       config.apiKey = await promptApiKey(choice);
       saveConfig(config);
     }
@@ -270,7 +282,7 @@ export async function initCommand(): Promise<void> {
       ["model", c.accent(config.model)],
       ["api key", choice === "ollama" ? c.dim("not needed") : keyFromEnv ? `from ${envVar}` : maskKey(config.apiKey)],
       ["language", config.language],
-      ["config", "~/.beacon/config.json"],
+      ["config", configPath().replace(homedir(), "~")],
     ]).join("\n"),
     "Saved",
   );
