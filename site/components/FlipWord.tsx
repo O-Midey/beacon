@@ -9,12 +9,13 @@ export interface FlipEntry {
 }
 
 /**
- * The hero's rotating platform word. The box is sized once to the widest word
- * so the headline never re-wraps; only the word flips and the colors change.
- * DOM is driven imperatively (classList/textContent on refs) because the
- * out-then-in choreography needs a forced reflow between positions — React
- * only renders the initial word. Cycling pauses on hidden tabs and is
- * disabled under prefers-reduced-motion.
+ * The hero's rotating platform word. Every word is also rendered as a hidden
+ * zero-height sizer inside the box, so the server HTML already reserves the
+ * width of the widest word — the headline never re-wraps, even on first
+ * paint before hydration. DOM is driven imperatively (classList/textContent
+ * on refs) because the out-then-in choreography needs a forced reflow between
+ * positions — React only renders the initial word. Cycling pauses on hidden
+ * tabs and is disabled under prefers-reduced-motion.
  */
 export function FlipWord({
   words,
@@ -31,26 +32,7 @@ export function FlipWord({
     const inner = wordRef.current;
     if (!box || !inner) return;
 
-    const sizeToWidest = () => {
-      const current = inner.textContent;
-      box.style.width = "auto";
-      let max = 0;
-      for (const { w } of words) {
-        inner.textContent = w;
-        max = Math.max(max, inner.offsetWidth);
-      }
-      inner.textContent = current;
-      // +4 = the box's own 2px left/right borders (border-box sizing)
-      box.style.width = `${max + 4}px`;
-    };
-
-    sizeToWidest();
-    document.fonts?.ready.then(sizeToWidest);
-    window.addEventListener("resize", sizeToWidest); // font size is clamp()-based
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return () => window.removeEventListener("resize", sizeToWidest);
-    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let idx = 0;
     let swap: ReturnType<typeof setTimeout> | undefined;
@@ -74,7 +56,6 @@ export function FlipWord({
     return () => {
       clearInterval(id);
       if (swap) clearTimeout(swap);
-      window.removeEventListener("resize", sizeToWidest);
     };
   }, [words, intervalMs]);
 
@@ -83,6 +64,11 @@ export function FlipWord({
       <span className="fw" ref={wordRef}>
         {words[0].w}
       </span>
+      {words.map(({ w }) => (
+        <span key={w} className="fw-size" aria-hidden="true">
+          {w}
+        </span>
+      ))}
     </span>
   );
 }

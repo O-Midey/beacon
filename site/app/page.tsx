@@ -135,7 +135,7 @@ export default function LandingPage() {
         <section id="privacy" className="sec privacy">
           <div className="wrap privacy-grid">
             <div className="reveal">
-              <h2 className="display" style={{ marginBottom: 18 }}>Nothing leaves your machine without you.</h2>
+              <h2 className="display title-gap-sm">Nothing leaves your machine without you.</h2>
               <p className="lede-p">
                 Beacon never posts. It can&apos;t — it has no credentials for your social accounts.{" "}
                 <strong>Approving a draft copies it to your clipboard</strong>, and that&apos;s the whole exit path.
@@ -153,7 +153,7 @@ export default function LandingPage() {
                 <span className="dot" style={{ background: "var(--t)" }} />
                 <span className="label">beacon review</span>
               </div>
-              <pre style={{ fontSize: 13 }}>
+              <pre>
 {""}<span className="c-p">✦ beacon review</span> — 3 drafts in queue{"\n\n"}
 <span className="c-y">draft 1/3 · significance 8/10</span>{"\n"}
 ────────────────────────────────────{"\n"}
@@ -203,8 +203,8 @@ export default function LandingPage() {
 
             <div className="reveal" style={{ "--d": ".15s" } as React.CSSProperties}>
               <span className="badge" style={{ background: "var(--t)", color: "#fff", rotate: "-2deg" }}>beacon ui</span>
-              <h2 className="display" style={{ marginBottom: 18 }}>Or review it in the browser.</h2>
-              <p className="lede-p" style={{ fontSize: 17, lineHeight: 1.6, marginBottom: 14 }}>
+              <h2 className="display title-gap-sm">Or review it in the browser.</h2>
+              <p className="lede-p">
                 One command opens the same queue as a web app — every platform&apos;s draft side by
                 side, edited inline. Commit in another terminal and the draft{" "}
                 <strong>appears in the open tab</strong>, live.
@@ -221,7 +221,7 @@ export default function LandingPage() {
         {/* FEATURES */}
         <section className="sec">
           <div className="wrap sec-pad">
-            <h2 className="display reveal" style={{ marginBottom: 36 }}>
+            <h2 className="display title-gap reveal">
               Built for people who&apos;d rather be coding.
             </h2>
             <div className="grid-feat">
@@ -275,7 +275,7 @@ export default function LandingPage() {
         {/* FAQ */}
         <section id="faq" className="sec">
           <div className="faq-wrap">
-            <h2 className="display reveal" style={{ marginBottom: 32 }}>Fair questions.</h2>
+            <h2 className="display title-gap reveal">Fair questions.</h2>
             <div className="faq-list">
               <details className="faq reveal">
                 <summary>Does it post automatically?</summary>
