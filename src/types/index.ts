@@ -139,15 +139,19 @@ export const DevToDraftSchema = z.object({
 });
 export type DevToDraft = z.infer<typeof DevToDraftSchema>;
 
-export const BlueskyDraftSchema = z.object({
-  text: z.string(),
+export const RedditDraftSchema = z.object({
+  title: z.string(),
+  body: z.string(),
 });
-export type BlueskyDraft = z.infer<typeof BlueskyDraftSchema>;
+export type RedditDraft = z.infer<typeof RedditDraftSchema>;
 
-export const MastodonDraftSchema = z.object({
-  text: z.string(),
+export const MediumDraftSchema = z.object({
+  title: z.string(),
+  subtitle: z.string().optional(),
+  tags: z.array(z.string()).min(1).max(5),
+  body: z.string(),
 });
-export type MastodonDraft = z.infer<typeof MastodonDraftSchema>;
+export type MediumDraft = z.infer<typeof MediumDraftSchema>;
 
 /**
  * Every platform key is optional: only the platforms enabled in config are
@@ -158,8 +162,8 @@ export const DraftSetPayloadSchema = z.object({
   twitter: TwitterDraftSchema.optional(),
   linkedin: LinkedInDraftSchema.optional(),
   devto: DevToDraftSchema.optional(),
-  bluesky: BlueskyDraftSchema.optional(),
-  mastodon: MastodonDraftSchema.optional(),
+  reddit: RedditDraftSchema.optional(),
+  medium: MediumDraftSchema.optional(),
 });
 export type DraftSetPayload = z.infer<typeof DraftSetPayloadSchema>;
 
@@ -206,8 +210,8 @@ export const PlatformTogglesSchema = z.object({
   twitter: z.boolean().default(true),
   linkedin: z.boolean().default(true),
   devto: z.boolean().default(true),
-  bluesky: z.boolean().default(false),
-  mastodon: z.boolean().default(false),
+  reddit: z.boolean().default(false),
+  medium: z.boolean().default(false),
 });
 export type PlatformToggles = z.infer<typeof PlatformTogglesSchema>;
 
@@ -217,8 +221,8 @@ export const PLATFORM_NAMES: readonly PlatformName[] = [
   "twitter",
   "linkedin",
   "devto",
-  "bluesky",
-  "mastodon",
+  "reddit",
+  "medium",
 ] as const;
 
 /** Supported LLM providers. `openai` covers any OpenAI-compatible endpoint. */

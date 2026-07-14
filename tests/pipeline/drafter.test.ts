@@ -102,14 +102,14 @@ describe("buildSystemPrompt", () => {
   it("includes only enabled platforms", () => {
     const cfg = ConfigSchema.parse({
       apiKey: "test",
-      platforms: { twitter: true, linkedin: false, devto: false, bluesky: true },
+      platforms: { twitter: true, linkedin: false, devto: false, reddit: true },
     });
     const prompt = buildSystemPrompt(cfg);
     expect(prompt).toContain('"twitter"');
-    expect(prompt).toContain('"bluesky"');
+    expect(prompt).toContain('"reddit"');
     expect(prompt).not.toContain('"linkedin"');
     expect(prompt).not.toContain('"devto"');
-    expect(prompt).not.toContain('"mastodon"');
+    expect(prompt).not.toContain('"medium"');
   });
 
   it("uses the configured author identity and language", () => {
@@ -146,7 +146,7 @@ describe("enabled-platform selection", () => {
   };
 
   it("throws API_ERROR when an enabled platform is missing from the response", () => {
-    const cfg = ConfigSchema.parse({ apiKey: "test", platforms: { bluesky: true } });
+    const cfg = ConfigSchema.parse({ apiKey: "test", platforms: { reddit: true } });
     expect(() => selectEnabledDrafts(payload, cfg)).toThrowError(/missing enabled platform/i);
   });
 

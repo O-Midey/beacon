@@ -2,7 +2,9 @@ import {
   BeaconError,
   type DevToDraft,
   type DraftSet,
+  type MediumDraft,
   type PlatformName,
+  type RedditDraft,
   type TwitterDraft,
 } from "../types/index.js";
 
@@ -61,9 +63,22 @@ function serializeDevTo(draft: DevToDraft): string {
   return `${header}\n\n# ${draft.title}\nTags: ${draft.tags.join(", ")}\n\n${draft.body}\n`;
 }
 
-function serializeText(kind: string, text: string): string {
-  const header = instructions([`Edit the ${kind} post. Lines starting with #> are ignored.`]);
-  return `${header}\n\n${text}\n`;
+function serializeReddit(draft: RedditDraft): string {
+  const header = instructions([
+    "Edit the Reddit post. Lines starting with #> are ignored.",
+    'The first "# " heading is the title; everything after it is the self-post body.',
+  ]);
+  return `${header}\n\n# ${draft.title}\n\n${draft.body}\n`;
+}
+
+function serializeMedium(draft: MediumDraft): string {
+  const header = instructions([
+    "Edit the Medium story. Lines starting with #> are ignored.",
+    'The first "# " heading is the title; the "Tags:" line sets the tags.',
+    "A line right after the title that isn't Tags: or blank becomes the subtitle.",
+  ]);
+  const subtitleLine = draft.subtitle ? `${draft.subtitle}\n` : "";
+  return `${header}\n\n# ${draft.title}\n${subtitleLine}Tags: ${draft.tags.join(", ")}\n\n${draft.body}\n`;
 }
 
 /** Render one platform draft as editable plain text. */
@@ -78,10 +93,10 @@ export function serializeForEdit(name: PlatformName, draftSet: DraftSet): string
       return draftSet.linkedin ? serializeLinkedIn(draftSet.linkedin.body) : missing();
     case "devto":
       return draftSet.devto ? serializeDevTo(draftSet.devto) : missing();
-    case "bluesky":
-      return draftSet.bluesky ? serializeText("Bluesky", draftSet.bluesky.text) : missing();
-    case "mastodon":
-      return draftSet.mastodon ? serializeText("Mastodon", draftSet.mastodon.text) : missing();
+    case "reddit":
+      return draftSet.reddit ? serializeReddit(draftSet.reddit) : missing();
+    case "medium":
+      return draftSet.medium ? serializeMedium(draftSet.medium) : missing();
   }
 }
 
@@ -157,6 +172,73 @@ function parseDevTo(text: string, original: DevToDraft): DevToDraft {
   return result;
 }
 
+function parseReddit(text: string, original: RedditDraft): RedditDraft {
+  const lines = text.split("\n");
+  let title = original.title;
+  const bodyLines: string[] = [];
+  let inPreamble = true;
+
+  for (const line of lines) {
+    if (inPreamble) {
+      if (!line.trim()) continue;
+      if (/^#\s+/.test(line)) {
+        title = line.replace(/^#\s+/, "").trim();
+        continue;
+      }
+      inPreamble = false;
+    }
+    bodyLines.push(line);
+  }
+
+  const body = bodyLines.join("\n").trim();
+  if (!body) {
+    throw new BeaconError("Edited post has an empty body", "QUEUE_CORRUPT");
+  }
+  return { title, body };
+}
+
+function parseMedium(text: string, original: MediumDraft): MediumDraft {
+  const lines = text.split("\n");
+  let title = original.title;
+  let subtitle = original.subtitle;
+  let tags = original.tags;
+  const bodyLines: string[] = [];
+  let inPreamble = true;
+  let sawTitle = false;
+  let sawSubtitleSlot = false;
+
+  for (const line of lines) {
+    if (inPreamble) {
+      if (!line.trim()) continue;
+      if (/^#\s+/.test(line) && !sawTitle) {
+        title = line.replace(/^#\s+/, "").trim();
+        sawTitle = true;
+        continue;
+      }
+      if (/^Tags:/i.test(line)) {
+        tags = splitTags(line);
+        sawSubtitleSlot = true;
+        continue;
+      }
+      if (sawTitle && !sawSubtitleSlot) {
+        subtitle = line.trim();
+        sawSubtitleSlot = true;
+        continue;
+      }
+      inPreamble = false;
+    }
+    bodyLines.push(line);
+  }
+
+  const body = bodyLines.join("\n").trim();
+  if (!body) {
+    throw new BeaconError("Edited story has an empty body", "QUEUE_CORRUPT");
+  }
+  const result: MediumDraft = { title, tags, body };
+  if (subtitle !== undefined) result.subtitle = subtitle;
+  return result;
+}
+
 /**
  * Parse edited text back into the platform's draft and return a new DraftSet.
  * Throws BeaconError with a human-readable reason when the edit is unusable.
@@ -181,9 +263,13 @@ export function parseEdited(name: PlatformName, edited: string, draftSet: DraftS
       if (!draftSet.devto) throw new BeaconError("Draft set has no devto draft", "QUEUE_CORRUPT");
       return { ...draftSet, devto: parseDevTo(text, draftSet.devto) };
     }
-    case "bluesky":
-      return { ...draftSet, bluesky: { text } };
-    case "mastodon":
-      return { ...draftSet, mastodon: { text } };
+    case "reddit": {
+      if (!draftSet.reddit) throw new BeaconError("Draft set has no reddit draft", "QUEUE_CORRUPT");
+      return { ...draftSet, reddit: parseReddit(text, draftSet.reddit) };
+    }
+    case "medium": {
+      if (!draftSet.medium) throw new BeaconError("Draft set has no medium draft", "QUEUE_CORRUPT");
+      return { ...draftSet, medium: parseMedium(text, draftSet.medium) };
+    }
   }
 }

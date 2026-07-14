@@ -136,7 +136,7 @@ describe("resolveConfig", () => {
     // Untouched keys keep their global values.
     expect(merged.platforms.linkedin).toBe(true);
     expect(merged.platforms.devto).toBe(true);
-    expect(merged.platforms.bluesky).toBe(false);
+    expect(merged.platforms.reddit).toBe(false);
   });
 
   it("lets a repo disable Beacon entirely", () => {

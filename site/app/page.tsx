@@ -26,8 +26,8 @@ export default function LandingPage() {
                       { w: "tweet", bg: "#FFC900", fg: "#000" },
                       { w: "post", bg: "#FF90E8", fg: "#000" },
                       { w: "article", bg: "#FFFFFF", fg: "#000" },
-                      { w: "skeet", bg: "#23A094", fg: "#fff" },
-                      { w: "toot", bg: "#FFC900", fg: "#000" },
+                      { w: "thread", bg: "#FF4500", fg: "#fff" },
+                      { w: "story", bg: "#000000", fg: "#fff" },
                     ]}
                   />
                   .
@@ -48,8 +48,8 @@ export default function LandingPage() {
                   <span className="chip">𝕏 / Twitter</span>
                   <span className="chip">LinkedIn</span>
                   <span className="chip">dev.to</span>
-                  <span className="chip">Bluesky</span>
-                  <span className="chip">Mastodon</span>
+                  <span className="chip">Reddit</span>
+                  <span className="chip">Medium</span>
                 </div>
               </div>
 
@@ -199,7 +199,7 @@ export default function LandingPage() {
               <div className="card lift reveal" style={{ padding: 22, "--d": ".08s" } as React.CSSProperties}>
                 <svg className="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><circle cx="8" cy="8" r="4" fill="#FF90E8" stroke="#000" strokeWidth="2" /><circle cx="24" cy="8" r="4" fill="#FFC900" stroke="#000" strokeWidth="2" /><circle cx="16" cy="16" r="4" fill="#23A094" stroke="#000" strokeWidth="2" /><circle cx="8" cy="24" r="4" fill="#FFC900" stroke="#000" strokeWidth="2" /><circle cx="24" cy="24" r="4" fill="#FF90E8" stroke="#000" strokeWidth="2" /></svg>
                 <h3>Five platforms, one prompt</h3>
-                <p>Twitter/X, LinkedIn, and dev.to on by default; Bluesky and Mastodon a toggle away. Each gets its own draft, adapted from a single pass.</p>
+                <p>Twitter/X, LinkedIn, and dev.to on by default; Reddit and Medium a toggle away. Each gets its own draft, adapted from a single pass.</p>
               </div>
               <div className="card lift reveal" style={{ padding: 22, "--d": ".16s" } as React.CSSProperties}>
                 <svg className="icon" width="36" height="36" viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="5" width="22" height="22" fill="#171714" stroke="#000" strokeWidth="2" /><circle cx="16" cy="16" r="6" fill="#FFC900" stroke="#000" strokeWidth="2" /></svg>

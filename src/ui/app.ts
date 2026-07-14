@@ -5,12 +5,12 @@ import {
   type DraftPayloads,
 } from "../lib/draft-render.js";
 import type {
-  BlueskyDraft,
   DevToDraft,
   LinkedInDraft,
-  MastodonDraft,
+  MediumDraft,
   PlatformName,
   QueueEntryStatus,
+  RedditDraft,
   TwitterDraft,
 } from "../types/index.js";
 
@@ -58,7 +58,7 @@ interface QueueResponse {
   entries: WireEntry[];
 }
 
-type PlatformPayload = TwitterDraft | LinkedInDraft | DevToDraft | BlueskyDraft | MastodonDraft;
+type PlatformPayload = TwitterDraft | LinkedInDraft | DevToDraft | RedditDraft | MediumDraft;
 
 /* ---------------------------------- api ---------------------------------- */
 
@@ -385,14 +385,41 @@ function buildEditForm(name: PlatformName, draftSet: WireDraftSet): EditForm | n
         },
       };
     }
-    case "bluesky":
-    case "mastodon": {
-      const draft = draftSet[name];
+    case "reddit": {
+      const draft = draftSet.reddit;
       if (!draft) return null;
-      const text = h("textarea", { class: "tall", value: draft.text });
+      const title = h("input", { type: "text", value: draft.title });
+      const body = h("textarea", { class: "tall", value: draft.body });
       return {
-        element: h("div", {}, field("Post", text)),
-        read: () => ({ text: text.value }),
+        element: h("div", {}, field("Title", title), field("Body (markdown)", body)),
+        read: () => ({ title: title.value, body: body.value }),
+      };
+    }
+    case "medium": {
+      const draft = draftSet.medium;
+      if (!draft) return null;
+      const title = h("input", { type: "text", value: draft.title });
+      const subtitle = h("input", { type: "text", value: draft.subtitle ?? "" });
+      const tags = h("input", { type: "text", value: draft.tags.join(", ") });
+      const body = h("textarea", { class: "tall", value: draft.body });
+      return {
+        element: h(
+          "div",
+          {},
+          field("Title", title),
+          field("Subtitle", subtitle, "optional"),
+          field("Tags", tags, "comma-separated, lowercase, 1–5"),
+          field("Body (markdown)", body),
+        ),
+        read: () => {
+          const subtitleText = subtitle.value.trim();
+          return {
+            title: title.value,
+            tags: splitList(tags.value),
+            body: body.value,
+            ...(subtitleText !== "" ? { subtitle: subtitleText } : {}),
+          };
+        },
       };
     }
   }
@@ -402,7 +429,7 @@ function buildEditForm(name: PlatformName, draftSet: WireDraftSet): EditForm | n
 
 function platformBlock(entry: WireEntry, name: PlatformName): HTMLElement {
   const key = `${entry.id}:${name}`;
-  const wide = name === "linkedin" || name === "devto";
+  const wide = name === "linkedin" || name === "devto" || name === "medium";
   const open = isExpanded(key);
   const block = h("div", { class: `plat${wide ? " wide" : ""}${open ? "" : " closed"}` });
 
