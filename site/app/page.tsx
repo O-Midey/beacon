@@ -79,7 +79,7 @@ export default function LandingPage() {
                 <span className="tl" style={{ "--i": "2.6s" } as React.CSSProperties}>  <span className="c-g">✓</span> safety scan passed — no secrets found</span>{"\n"}
                 <span className="tl" style={{ "--i": "3.2s" } as React.CSSProperties}>  <span className="c-g">✓</span> significance: 8/10 (threshold 6)</span>{"\n"}
                 <span className="tl" style={{ "--i": "3.8s" } as React.CSSProperties}>  <span className="c-g">✓</span> drafting for twitter, linkedin, dev.to…</span>{"\n\n"}
-                <span className="tl" style={{ "--i": "4.4s" } as React.CSSProperties}>  <span className="c-y">3 drafts queued</span> → run <span className="c-p">beacon review</span> </span>
+                <span className="tl" style={{ "--i": "4.4s" } as React.CSSProperties}>  <span className="c-y">3 drafts queued</span> → run <span className="c-p">beacon review</span> or <span className="c-p">beacon ui</span> </span>
                 <span className="cursor" />
               </pre>
                 </div>
@@ -90,8 +90,8 @@ export default function LandingPage() {
           {/* TICKER — bottom edge of the first screen */}
           <div className="ticker" aria-hidden="true">
             <div className="ticker-track">
-              <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
-              <span>never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no server ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+              <span>never auto-posted ✦ no cloud ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no cloud ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no cloud ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
+              <span>never auto-posted ✦ no cloud ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no cloud ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ never auto-posted ✦ no cloud ✦ no database ✦ your diff stays local ✦ works offline with ollama ✦ MIT licensed ✦ </span>
             </div>
           </div>
         </section>
@@ -142,7 +142,7 @@ export default function LandingPage() {
               </p>
               <ul className="rules">
                 <li>approve → clipboard, never an API call</li>
-                <li>edit → opens your $EDITOR, validated on save</li>
+                <li>edit → your $EDITOR, or inline in the browser</li>
                 <li>discard or skip → the queue is yours</li>
               </ul>
             </div>
@@ -165,6 +165,55 @@ export default function LandingPage() {
 <span className="c-y">[a]</span> approve → clipboard  <span className="c-y">[e]</span> edit in $EDITOR{"\n"}
 <span className="c-y">[d]</span> discard             <span className="c-y">[s]</span> skip
               </pre>
+            </div>
+          </div>
+        </section>
+
+        {/* BEACON UI */}
+        <section id="beacon-ui" className="sec">
+          <div className="wrap ui-grid">
+            <div className="browser reveal">
+              <div className="urlbar">
+                <span className="dot" style={{ background: "var(--p)" }} />
+                <span className="dot" style={{ background: "var(--y)" }} />
+                <span className="dot" style={{ background: "var(--t)" }} />
+                <span className="url">127.0.0.1:2322</span>
+              </div>
+              <div className="ui-body">
+                <div className="ui-head">
+                  <span>3 drafts · significance 8/10</span>
+                  <span className="ui-live">live</span>
+                </div>
+                <div className="ui-tabs">
+                  <span className="ui-tab on">twitter/x</span>
+                  <span className="ui-tab">linkedin</span>
+                  <span className="ui-tab">dev.to</span>
+                </div>
+                <div className="ui-draft">
+                  Shipped offline sync for Rocket Editor. Your drafts now survive a dead wifi
+                  connection — and so does your flow. 87 lines, mostly worth it.
+                </div>
+                <div className="ui-acts">
+                  <span className="ui-btn pri">copy &amp; approve</span>
+                  <span className="ui-btn">edit</span>
+                  <span className="ui-btn">discard</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="reveal" style={{ "--d": ".15s" } as React.CSSProperties}>
+              <span className="badge" style={{ background: "var(--t)", color: "#fff", rotate: "-2deg" }}>beacon ui</span>
+              <h2 className="display" style={{ marginBottom: 18 }}>Or review it in the browser.</h2>
+              <p className="lede-p" style={{ fontSize: 17, lineHeight: 1.6, marginBottom: 14 }}>
+                One command opens the same queue as a web app — every platform&apos;s draft side by
+                side, edited inline. Commit in another terminal and the draft{" "}
+                <strong>appears in the open tab</strong>, live.
+              </p>
+              <ul className="rules">
+                <li>one queue → approve in the terminal or the browser</li>
+                <li>127.0.0.1 only → token-locked, never on the network</li>
+                <li>Ctrl-C → and it&apos;s gone</li>
+              </ul>
             </div>
           </div>
         </section>
@@ -234,7 +283,7 @@ export default function LandingPage() {
               </details>
               <details className="faq reveal" style={{ "--d": ".06s" } as React.CSSProperties}>
                 <summary>Is my code sent anywhere?</summary>
-                <p>Only a secret-redacted, truncated diff goes to your chosen LLM provider — or nowhere at all if you use Ollama. No server, no database, no cloud sync: just two JSON files under ~/.beacon/.</p>
+                <p>Only a secret-redacted, truncated diff goes to your chosen LLM provider — or nowhere at all if you use Ollama. No cloud, no database, no sync: just two JSON files under ~/.beacon/. The one server Beacon runs is beacon ui — on 127.0.0.1, on your own machine.</p>
               </details>
               <details className="faq reveal" style={{ "--d": ".12s" } as React.CSSProperties}>
                 <summary>What if I commit a secret?</summary>
