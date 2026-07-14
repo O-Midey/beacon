@@ -3,7 +3,7 @@ import { BeaconConfigSchema, DraftSetSchema, QueueEntrySchema } from "../src/typ
 
 /**
  * Backward compatibility of persisted data. Config and queue files written by
- * older Beacon versions (before Bluesky/Mastodon, authorBio, language) MUST
+ * older Beacon versions (before Reddit/Medium, authorBio, language) MUST
  * still parse — these schemas are the on-disk contract.
  */
 
@@ -18,8 +18,8 @@ describe("config written before v0.3", () => {
       twitter: true,
       linkedin: false,
       devto: true,
-      bluesky: false,
-      mastodon: false,
+      reddit: false,
+      medium: false,
     });
   });
 
@@ -42,8 +42,8 @@ describe("queue entries written before v0.3", () => {
 
   it("parses a draft set without the new platform keys", () => {
     const parsed = DraftSetSchema.parse(oldDraftSet);
-    expect(parsed.bluesky).toBeUndefined();
-    expect(parsed.mastodon).toBeUndefined();
+    expect(parsed.reddit).toBeUndefined();
+    expect(parsed.medium).toBeUndefined();
     expect(parsed.twitter?.tweets).toEqual(["t"]);
   });
 

@@ -30,8 +30,8 @@ cat > "$DEMO_HOME/.beacon/config.json" <<'EOF'
     "twitter": true,
     "linkedin": true,
     "devto": false,
-    "bluesky": false,
-    "mastodon": false
+    "reddit": false,
+    "medium": false
   }
 }
 EOF

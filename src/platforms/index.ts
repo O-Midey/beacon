@@ -1,14 +1,14 @@
 import type { BeaconConfig, PlatformName } from "../types/index.js";
-import { bluesky } from "./bluesky.js";
 import { devto } from "./devto.js";
 import { linkedin } from "./linkedin.js";
-import { mastodon } from "./mastodon.js";
+import { medium } from "./medium.js";
+import { reddit } from "./reddit.js";
 import { twitter } from "./twitter.js";
 
-export { twitter, linkedin, devto, bluesky, mastodon };
+export { twitter, linkedin, devto, reddit, medium };
 
 /** All platform configs, in canonical display order. */
-export const platforms = [twitter, linkedin, devto, bluesky, mastodon] as const;
+export const platforms = [twitter, linkedin, devto, reddit, medium] as const;
 
 export type PlatformConfig = (typeof platforms)[number];
 

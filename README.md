@@ -11,7 +11,7 @@
 
 ![beacon init, a commit drafting in the background, and beacon review approving a draft to the clipboard](https://raw.githubusercontent.com/O-Midey/beacon/main/assets/demo.gif)
 
-Beacon installs a `post-commit` git hook that reads your diff and commit message, runs it through a **secret scanner → significance filter → voice drafter**, and writes platform-specific drafts to a local review queue for **Twitter/X**, **LinkedIn**, **dev.to**, **Bluesky**, and **Mastodon**.
+Beacon installs a `post-commit` git hook that reads your diff and commit message, runs it through a **secret scanner → significance filter → voice drafter**, and writes platform-specific drafts to a local review queue for **Twitter/X**, **LinkedIn**, **dev.to**, **Reddit**, and **Medium**.
 
 **Nothing is ever published automatically.** You always review, edit, approve, or discard before anything leaves your machine.
 
@@ -185,7 +185,7 @@ All config lives in `~/.beacon/config.json` (mode `0600`).
 | `authorBio`             | —                   | How posts describe you, e.g. `"a fullstack engineer building devtools"`.                                                         |
 | `authorNotes`           | —                   | Voice notes appended to the drafter prompt (tone, phrases to avoid…).                                                            |
 | `language`              | `English`           | Language all drafts are written in — any language name works.                                                                    |
-| `platforms`             | see notes           | `twitter` / `linkedin` / `devto` on, `bluesky` / `mastodon` off. Toggle each with `beacon config set platform <name> <on\|off>`. |
+| `platforms`             | see notes           | `twitter` / `linkedin` / `devto` on, `reddit` / `medium` off. Toggle each with `beacon config set platform <name> <on\|off>`.    |
 | `model`                 | `claude-sonnet-4-6` | Model ID for the active provider.                                                                                                |
 | `maxDiffChars`          | `8000`              | Diff truncation limit before LLM calls.                                                                                          |
 | `enabled`               | `true`              | When false, the hook is a no-op: no LLM call, no draft, no spend.                                                                |

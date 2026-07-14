@@ -41,8 +41,6 @@ import {
 /** Character budget per platform, used only to color the meta line. */
 const CHAR_LIMIT: Partial<Record<PlatformName, number>> = {
   twitter: 280, // per tweet
-  bluesky: 300,
-  mastodon: 500,
 };
 
 function scoreColor(score: number): (s: string) => string {
@@ -86,11 +84,9 @@ function platformMeta(name: PlatformName, draftSet: DraftSet): string | undefine
     }
     case "linkedin":
       return draftSet.linkedin ? overBudget(draftSet.linkedin.body.length) : undefined;
-    case "bluesky":
-      return draftSet.bluesky ? overBudget(draftSet.bluesky.text.length) : undefined;
-    case "mastodon":
-      return draftSet.mastodon ? overBudget(draftSet.mastodon.text.length) : undefined;
     case "devto":
+    case "reddit":
+    case "medium":
       return undefined; // the rendered title/tags already say enough
   }
 }

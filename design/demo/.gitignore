@@ -4,5 +4,6 @@ home/
 video/
 frames/
 *.webm
+*.mp4
 *.log
 fail.png

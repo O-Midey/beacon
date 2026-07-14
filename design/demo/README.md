@@ -44,3 +44,25 @@ assume a fresh start.
 
 The `beacon ui` recording uses port **4340**, not the default 2322, so a real
 `beacon ui` session can keep running while you record.
+
+## Site tours (`tour/`)
+
+Cursorful-style walkthrough videos of the marketing site: the page floats on a
+brand-gradient stage in a rounded, shadowed frame; a halo pointer cursor leads
+every move with click ripples; the camera follows with punch-in zooms, eased
+scrolling, and chapter chips.
+
+| File | What it is |
+| --- | --- |
+| `tour/rig.mjs` | The engine — stage + framed iframe, in-page camera (transform-based zoom that survives sticky headers and scroll reveals), halo cursor, chip, server/recorder plumbing. |
+| `tour/home.mjs`, `tour/changelog.mjs`, `tour/docs.mjs` | One storyboard per page, written as cursor-led stops (`lead`, `click`, `cam.*`). |
+| `tour/record.mjs` | Runner. |
+
+```bash
+cd site && npm run build && cd ../design/demo
+node tour/record.mjs             # all three
+node tour/record.mjs docs        # or one of: home | changelog | docs
+```
+
+Outputs `site-tour-<name>.webm` + `.mp4` here (git-ignored). The site is
+served on port **4341** so a dev server can keep running.

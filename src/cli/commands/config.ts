@@ -23,7 +23,7 @@ import {
  *   beacon config set author-notes <text...>
  *   beacon config set language <language>
  *   beacon config set model <model>
- *   beacon config set platform <twitter|linkedin|devto|bluesky|mastodon> <on|off>
+ *   beacon config set platform <twitter|linkedin|devto|reddit|medium> <on|off>
  *   beacon config show
  */
 

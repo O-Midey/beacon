@@ -6,6 +6,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Reddit and Medium platforms** (opt-in: `beacon config set platform reddit on`,
+  `beacon config set platform medium on`). Reddit drafts a title and a
+  self-post body for a technical subreddit; Medium drafts a full story with
+  title, optional subtitle, tags, and body.
+
+### Removed
+
+- **Bluesky and Mastodon platforms.** Disable them in existing configs before
+  upgrading if you rely on them — `platforms.bluesky` and `platforms.mastodon`
+  are no longer recognized keys.
+
 ## [0.5.0] - 2026-07-11
 
 ### Added

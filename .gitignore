@@ -11,5 +11,5 @@ tsup.config.bundled_*.mjs
 
 # Claude Code session permissions — local only
 .claude/settings.json
-/design/README.md
 /design/*.md
+/design/*.html

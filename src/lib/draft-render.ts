@@ -11,7 +11,7 @@ import type { DraftSet, PlatformName } from "../types/index.js";
  */
 
 /** Canonical display order. Kept in sync with PLATFORM_NAMES by the check below. */
-export const PLATFORM_ORDER = ["twitter", "linkedin", "devto", "bluesky", "mastodon"] as const;
+export const PLATFORM_ORDER = ["twitter", "linkedin", "devto", "reddit", "medium"] as const;
 
 // Compile-time exhaustiveness: adding a platform to PlatformToggles without
 // adding it here (or to LABELS) is a type error.
@@ -23,8 +23,8 @@ export const PLATFORM_LABELS: Record<PlatformName, string> = {
   twitter: "Twitter / X",
   linkedin: "LinkedIn",
   devto: "dev.to",
-  bluesky: "Bluesky",
-  mastodon: "Mastodon",
+  reddit: "Reddit",
+  medium: "Medium",
 };
 
 export function renderTwitter(draft: NonNullable<DraftSet["twitter"]>): string {
@@ -46,6 +46,16 @@ export function renderDevTo(draft: NonNullable<DraftSet["devto"]>): string {
     ? `\n\n<!-- cover image prompt: ${draft.coverImagePrompt} -->`
     : "";
   return `# ${draft.title}\n\nTags: ${tags}\n\n${draft.body}${cover}`;
+}
+
+export function renderReddit(draft: NonNullable<DraftSet["reddit"]>): string {
+  return `${draft.title}\n\n${draft.body}`;
+}
+
+export function renderMedium(draft: NonNullable<DraftSet["medium"]>): string {
+  const tags = draft.tags.map((t) => (t.startsWith("#") ? t : `#${t}`)).join(" ");
+  const subtitle = draft.subtitle ? `\n\n${draft.subtitle}` : "";
+  return `# ${draft.title}${subtitle}\n\nTags: ${tags}\n\n${draft.body}`;
 }
 
 /**
@@ -73,9 +83,9 @@ export function renderPlatform(name: PlatformName, draftSet: DraftPayloads): str
       return draftSet.linkedin ? renderLinkedIn(draftSet.linkedin) : null;
     case "devto":
       return draftSet.devto ? renderDevTo(draftSet.devto) : null;
-    case "bluesky":
-      return draftSet.bluesky ? draftSet.bluesky.text : null;
-    case "mastodon":
-      return draftSet.mastodon ? draftSet.mastodon.text : null;
+    case "reddit":
+      return draftSet.reddit ? renderReddit(draftSet.reddit) : null;
+    case "medium":
+      return draftSet.medium ? renderMedium(draftSet.medium) : null;
   }
 }
