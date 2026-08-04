@@ -21,6 +21,24 @@ export function wordmark(): string {
   return c.brand(`${GLYPH} beacon`);
 }
 
+/**
+ * Branded outcome line closing a command: `✦ Draft queued — beacon review`.
+ * The glyph carries the brand; the message is bold so the outcome reads at a
+ * glance. Pairs with `banner()` the way clack's outro pairs with intro.
+ */
+export function closing(message: string): void {
+  logger.plain("");
+  logger.plain(`${c.brand(GLYPH)} ${c.bold(message)}`);
+  logger.plain("");
+}
+
+/** Paint a 0–10 significance score: green when high, brand when decent, dim below. */
+export function scoreColor(score: number): (s: string) => string {
+  if (score >= 8) return c.success;
+  if (score >= 6) return c.accent;
+  return c.dim;
+}
+
 /** Content width for rules/cards: terminal width clamped to a readable band. */
 export function contentWidth(): number {
   const cols = process.stdout.columns ?? MAX_WIDTH;
