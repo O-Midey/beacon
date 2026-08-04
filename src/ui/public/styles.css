@@ -196,6 +196,27 @@ summary:focus-visible {
 }
 .sort-select:hover { transform: translate(3px, 3px); box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
 
+/* ---------- repo groups ---------- */
+.repo-group { margin-top: 40px; }
+.repo-group:first-child { margin-top: 0; }
+.repo-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 9px;
+  margin-bottom: 20px;
+  border-bottom: 3px solid #000;
+}
+.repo-group-name { font-weight: 800; font-size: 19px; letter-spacing: -0.02em; }
+.repo-group-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: #55534b;
+  margin-left: auto;
+}
+
 /* ---------- entry cards ---------- */
 .card {
   background: #fff;
@@ -217,7 +238,6 @@ summary:focus-visible {
   padding: 14px 18px;
   border-bottom: 2px solid #000;
 }
-.repo { font-weight: 800; font-size: 15px; }
 .hash {
   font-family: var(--mono);
   font-size: 12px;
@@ -376,6 +396,7 @@ summary:focus-visible {
 
 @media (max-width: 560px) {
   .when { margin-left: 0; width: 100%; }
+  .repo-group-count { margin-left: 0; width: 100%; }
   .plat-grid { grid-template-columns: 1fr; }
   .card { box-shadow: 4px 4px 0 #000; }
 }
