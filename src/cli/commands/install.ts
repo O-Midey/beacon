@@ -1,7 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+import { c } from "../../lib/colors.js";
 import { logger } from "../../lib/logger.js";
+import { banner, closing } from "../../lib/ui.js";
 import { BeaconError } from "../../types/index.js";
 
 /**
@@ -40,7 +42,19 @@ function displayPath(p: string): string {
   return rel && !rel.startsWith("..") ? rel : p;
 }
 
-export function installCommand(): void {
+export interface InstallOptions {
+  /**
+   * `beacon install` run on its own gets the full open/close ceremony;
+   * `beacon init` calls this mid-flow inside the clack gutter, where a banner
+   * would tear the prompt column.
+   */
+  standalone?: boolean;
+}
+
+export function installCommand(options: InstallOptions = {}): void {
+  const standalone = options.standalone ?? true;
+  if (standalone) banner("install");
+
   const hooksDir = resolveHooksDir();
   if (!existsSync(hooksDir)) {
     mkdirSync(hooksDir, { recursive: true });
@@ -51,6 +65,7 @@ export function installCommand(): void {
     writeFileSync(hookPath, `${SHEBANG}\n\n${HOOK_SNIPPET}\n`, { mode: 0o755 });
     chmodSync(hookPath, 0o755);
     logger.success(`Installed Beacon post-commit hook at ${displayPath(hookPath)}`);
+    if (standalone) closing(`Commit something — Beacon drafts it. ${c.code("beacon review")} when ready.`);
     return;
   }
 
@@ -66,4 +81,5 @@ export function installCommand(): void {
   writeFileSync(hookPath, `${prefix}${existing}${separator}${HOOK_SNIPPET}\n`);
   chmodSync(hookPath, 0o755);
   logger.success(`Appended Beacon hook to existing post-commit at ${displayPath(hookPath)}`);
+  if (standalone) closing(`Commit something — Beacon drafts it. ${c.code("beacon review")} when ready.`);
 }

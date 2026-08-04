@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { c } from "../../lib/colors.js";
 import { isProcessAlive } from "../../lib/lock.js";
 import { logger } from "../../lib/logger.js";
+import { banner, closing, keyValueLines, sectionLabel } from "../../lib/ui.js";
 import { createBeaconServer, type BeaconServerHandle } from "../../server/index.js";
 import { readServeState, removeServeState, writeServeState } from "../../server/state.js";
 import { mintToken } from "../../server/token.js";
@@ -111,21 +112,26 @@ export async function waitForShutdown(api: StartedApi): Promise<void> {
 }
 
 export async function serveCommand(options: ServeOptions): Promise<void> {
+  banner("serve");
   const api = await startLocalApi(options);
 
-  logger.success(`Beacon serve listening on ${c.code(`http://127.0.0.1:${api.port}`)}`);
-  logger.info(`Session token: ${api.token}`);
+  logger.success(`Listening on ${c.code(`http://127.0.0.1:${api.port}`)}`);
+  logger.info(`Session token: ${c.accent(api.token)}`);
   logger.plain("");
-  logger.plain(`  GET   /queue                  pending + reviewed entries`);
-  logger.plain(`  POST  /entries/:id/approve    mark approved`);
-  logger.plain(`  POST  /entries/:id/discard    mark discarded`);
-  logger.plain(`  PATCH /entries/:id/drafts     save edited drafts`);
-  logger.plain(`  GET   /events                 live updates (SSE)`);
+  logger.plain(sectionLabel("api"));
+  for (const line of keyValueLines([
+    ["GET   /queue", c.dim("pending + reviewed entries")],
+    ["POST  /entries/:id/approve", c.dim("mark approved")],
+    ["POST  /entries/:id/discard", c.dim("mark discarded")],
+    ["PATCH /entries/:id/drafts", c.dim("save edited drafts")],
+    ["GET   /events", c.dim("live updates (SSE)")],
+  ])) {
+    logger.plain(`  ${line}`);
+  }
   logger.plain("");
-  logger.plain(`  All routes need ${c.code("Authorization: Bearer <token>")} (or ?token= on /events).`);
-  logger.plain("");
-  logger.info("Press Ctrl-C to stop.");
+  logger.plain(c.dim(`All routes need ${c.code("Authorization: Bearer <token>")} (or ?token= on /events).`));
+  logger.plain(c.dim("Press ctrl-c to stop."));
 
   await waitForShutdown(api);
-  logger.info("Beacon serve stopped.");
+  closing("Beacon serve stopped.");
 }

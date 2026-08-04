@@ -3,9 +3,10 @@ import { hasApiKey } from "../../lib/config.js";
 import { logger } from "../../lib/logger.js";
 import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
 import { loadEffectiveConfig } from "../../lib/repo-config.js";
-import { startSpinner, type Spinner } from "../../lib/spinner.js";
-import { runPipeline, type PipelineStage } from "../../pipeline/index.js";
+import { closing } from "../../lib/ui.js";
+import { runPipeline, type PipelineOutcome } from "../../pipeline/index.js";
 import { isBeaconError } from "../../types/index.js";
+import { runPipelineWithChecklist } from "./shared.js";
 
 /**
  * `beacon run` — the command the git post-commit hook calls.
@@ -13,18 +14,13 @@ import { isBeaconError } from "../../types/index.js";
  * Runs the full pipeline and, critically, NEVER throws to stdout/stderr on a
  * non-critical error: everything is logged to ~/.beacon/beacon.log so the git
  * hook does not pollute commit output. Success prints a single concise line.
+ *
+ * With --silent (the hook) the pipeline runs with no progress reporting at
+ * all; a manual `beacon run` gets the same live checklist as `beacon draft`.
  */
 export interface RunOptions {
   silent?: boolean;
 }
-
-const STAGE_LABEL: Record<PipelineStage, string> = {
-  capture: "Reading the latest commit…",
-  safety: "Scanning for secrets…",
-  significance: "Assessing significance…",
-  draft: "Drafting posts…",
-  queue: "Saving to the review queue…",
-};
 
 export async function runCommand(options: RunOptions = {}): Promise<void> {
   const silent = options.silent ?? false;
@@ -56,17 +52,15 @@ export async function runCommand(options: RunOptions = {}): Promise<void> {
       return;
     }
 
-    // A spinner only when interactive (manual `beacon run`); the hook is silent.
-    const spinner: Spinner | null = silent ? null : startSpinner("Starting…");
-    const outcome = await runPipeline(config, {
-      onStage: (stage) => spinner?.update(STAGE_LABEL[stage]),
-    });
+    // The live checklist only when someone is watching; the hook stays quiet.
+    const outcome: PipelineOutcome = silent
+      ? await runPipeline(config)
+      : await runPipelineWithChecklist(config);
 
     switch (outcome.kind) {
       case "not_significant": {
         const msg = `commit not significant (score: ${outcome.significance.score}/10) — skipped`;
         logger.file("info", `Beacon: ${msg}`);
-        spinner?.stop();
         if (!silent) logger.info(`Beacon: ${msg}`);
         return;
       }
@@ -75,26 +69,28 @@ export async function runCommand(options: RunOptions = {}): Promise<void> {
         const detail = criticals.map((f) => `${f.pattern} @ ${f.source} line ${f.line}`).join(", ");
         const msg = `Beacon: drafting blocked — critical safety findings: ${detail}`;
         logger.file("error", msg);
-        spinner?.fail(c.error(msg));
-        if (silent) logger.warn(msg);
+        // Silent or not, this one must be seen: the hook surfaces it too.
+        logger.warn(msg);
         return;
       }
       case "queued": {
         const msg = `draft queued (score: ${outcome.significance.score}/10) — run \`beacon review\` to see it`;
         logger.file("info", `Beacon: ${msg} [id=${outcome.entryId}]`);
-        if (spinner) {
-          spinner.succeed(
-            `Beacon: draft queued ${c.dim(`(score ${outcome.significance.score}/10)`)} — run ${c.code(
-              "beacon review",
-            )}`,
+        if (!silent) {
+          closing(
+            `Draft queued ${c.dim(`(score ${outcome.significance.score}/10)`)} — ${c.code("beacon review")}`,
           );
-        } else {
-          logger.success(`Beacon: ${msg}`);
         }
         return;
       }
     }
   } catch (err) {
+    if (isBeaconError(err) && err.code === "CANCELLED") {
+      logger.file("info", "Beacon run cancelled by the user.");
+      if (!silent) logger.plain(c.dim("Cancelled — nothing was queued."));
+      process.exitCode = 130;
+      return;
+    }
     const message = isBeaconError(err)
       ? `[${err.code}] ${err.message}`
       : err instanceof Error

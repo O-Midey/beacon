@@ -5,10 +5,9 @@ import { getRangeSnapshot, getSnapshot, repoRoot } from "../../lib/git.js";
 import { logger } from "../../lib/logger.js";
 import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
 import { loadEffectiveConfig } from "../../lib/repo-config.js";
-import { startSpinner } from "../../lib/spinner.js";
-import { runPipeline, type PipelineStage } from "../../pipeline/index.js";
+import { banner, closing } from "../../lib/ui.js";
 import { BeaconError, isBeaconError, type WorkspaceSnapshot } from "../../types/index.js";
-import { ensureConfigured, reportPipelineError } from "./shared.js";
+import { ensureConfigured, reportPipelineError, runPipelineWithChecklist } from "./shared.js";
 
 /**
  * `beacon draft` — manual trigger.
@@ -22,6 +21,9 @@ import { ensureConfigured, reportPipelineError } from "./shared.js";
  * "what I shipped this week" digest rhythm. Always runs the full pipeline with
  * the significance gate forced open (the user asked for a draft explicitly),
  * and still passes content through the safety scanner.
+ *
+ * Runs with the full live experience: per-stage checklist, streaming draft
+ * preview, ctrl-C cancel (exit 130, nothing queued).
  */
 export interface DraftOptions {
   message?: string;
@@ -39,14 +41,6 @@ function resolveSince(options: DraftOptions): string | undefined {
   }
   return since;
 }
-
-const STAGE_LABEL: Record<PipelineStage, string> = {
-  capture: "Reading workspace…",
-  safety: "Scanning for secrets…",
-  significance: "Assessing significance…",
-  draft: "Drafting posts in your voice…",
-  queue: "Saving to the review queue…",
-};
 
 /** Build a synthetic snapshot from a context file (no git needed). */
 function snapshotFromFile(filePath: string, message: string | undefined): WorkspaceSnapshot {
@@ -99,13 +93,9 @@ export async function draftCommand(options: DraftOptions = {}): Promise<void> {
     }
   }
 
-  const spinner = startSpinner("Starting…");
+  banner("draft");
   try {
-    const outcome = await runPipeline(config, {
-      snapshot,
-      force: true,
-      onStage: (stage) => spinner.update(STAGE_LABEL[stage]),
-    });
+    const outcome = await runPipelineWithChecklist(config, { snapshot, force: true });
 
     switch (outcome.kind) {
       case "blocked_unsafe": {
@@ -113,26 +103,25 @@ export async function draftCommand(options: DraftOptions = {}): Promise<void> {
           .filter((f) => f.severity === "critical")
           .map((f) => `${f.pattern} @ line ${f.line}`)
           .join(", ");
-        spinner.fail(c.error(`Blocked — critical safety findings: ${detail}`));
-        logger.plain(c.dim("Nothing was sent to the model. Remove the secret(s) and try again."));
+        logger.plain(c.dim(`  ${detail}`));
+        logger.plain(c.dim("  Nothing was sent to the model. Remove the secret(s) and try again."));
         process.exitCode = 1;
         return;
       }
       case "queued": {
-        spinner.succeed(
-          `Draft queued ${c.dim(`(significance ${outcome.significance.score}/10)`)} — run ${c.code(
-            "beacon review",
-          )} to see it`,
-        );
+        closing(`Draft queued — ${c.code("beacon review")}`);
         return;
       }
       case "not_significant":
-        spinner.stop();
         logger.info("Nothing queued.");
         return;
     }
   } catch (err) {
-    spinner.fail();
+    if (isBeaconError(err) && err.code === "CANCELLED") {
+      logger.plain(c.dim("Cancelled — nothing was queued."));
+      process.exitCode = 130;
+      return;
+    }
     if (isBeaconError(err)) {
       reportPipelineError(err);
     } else {

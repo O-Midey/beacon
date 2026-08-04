@@ -7,9 +7,9 @@ import { logger } from "../../lib/logger.js";
 import { DEFAULT_BASE_URL } from "../../lib/llm/endpoints.js";
 import { pingProvider } from "../../lib/llm/index.js";
 import { REPO_CONFIG_FILENAME } from "../../lib/paths.js";
+import { createLiveRenderer } from "../../lib/live/renderer.js";
 import { inspectRepoConfig, type RepoConfigStatus } from "../../lib/repo-config.js";
-import { startSpinner } from "../../lib/spinner.js";
-import { banner } from "../../lib/ui.js";
+import { banner, closing } from "../../lib/ui.js";
 import { isBeaconError, type BeaconConfig } from "../../types/index.js";
 
 /**
@@ -194,7 +194,8 @@ export async function doctorCommand(): Promise<void> {
   // Live ping only if a key is present. Its result joins `checks` so a failed
   // ping actually sinks the summary and the exit code.
   if (keyPresent) {
-    const spinner = startSpinner(`Pinging ${config.provider}…`);
+    const renderer = createLiveRenderer({ hint: "" });
+    const activity = renderer.startActivity(`Pinging ${config.provider}…`);
     let ping: Check;
     try {
       await pingProvider(config);
@@ -206,17 +207,18 @@ export async function doctorCommand(): Promise<void> {
         hint: isBeaconError(err) ? err.message : String(err),
       };
     }
-    spinner.stop();
+    activity.stop();
+    renderer.dispose();
     checks.push(ping);
     print(ping);
   }
 
   const failed = checks.some((ch) => ch.level === "fail");
-  logger.plain("");
   if (failed) {
+    logger.plain("");
     logger.warn("Some checks failed — see hints above.");
     process.exitCode = 1;
   } else {
-    logger.success("Beacon looks healthy.");
+    closing("Beacon looks healthy.");
   }
 }

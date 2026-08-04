@@ -293,7 +293,7 @@ export async function initCommand(): Promise<void> {
 
   // Optional: install the hook if we're in a repo.
   if (inRepo && (await confirm({ message: "Install the post-commit hook in this repo?", initialValue: true }))) {
-    installCommand();
+    installCommand({ standalone: false });
   }
 
   // First-run draft moment: end setup with real output, not just config.
