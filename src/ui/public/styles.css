@@ -11,7 +11,7 @@
   --dark: #171714;
   --term-fg: #e8e6df;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --sans: "Space Grotesk", sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; }
