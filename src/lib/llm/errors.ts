@@ -19,6 +19,20 @@ interface ClassifyInput {
   cause?: string | undefined;
 }
 
+/**
+ * True for a fetch/reader rejection caused by an AbortSignal. Must be checked
+ * BEFORE classifyLlmError — its network-error regex would otherwise label a
+ * user's ctrl-C as a connectivity problem.
+ */
+export function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === "AbortError";
+}
+
+/** The typed error for a user-cancelled request (ctrl-C mid-draft). */
+export function cancelledError(): BeaconError {
+  return new BeaconError("Cancelled.", "CANCELLED");
+}
+
 /** Classify an HTTP status / cause into a code + user-facing message. */
 export function classifyLlmError(input: ClassifyInput): BeaconError {
   const { config, status, cause } = input;

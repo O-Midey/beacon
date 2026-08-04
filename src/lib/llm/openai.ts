@@ -1,14 +1,17 @@
 import { BeaconError, type BeaconConfig } from "../../types/index.js";
 import { resolveApiKey } from "../config.js";
 import { resolveBaseUrl } from "./endpoints.js";
-import { classifyLlmError } from "./errors.js";
+import { openAiDelta } from "./sse.js";
+import { consumeStream, isEventStream, postCompletion } from "./transport.js";
 import type { CompletionParams, LlmProvider } from "./types.js";
 
 /**
  * OpenAI-compatible provider using the Chat Completions API over `fetch`.
  *
  * Works with OpenAI and any compatible endpoint (OpenRouter, Groq, Together,
- * a local server, …) via the configurable `baseUrl`. No SDK dependency.
+ * Ollama, a local server, …) via the configurable `baseUrl`. No SDK
+ * dependency. Streaming (SSE) kicks in when the caller passes `onChunk`; a
+ * compat server that ignores `stream: true` falls back to the one-shot path.
  */
 
 type FetchFn = typeof fetch;
@@ -42,37 +45,35 @@ export class OpenAiProvider implements LlmProvider {
         { role: "system", content: params.system },
         { role: "user", content: params.user },
       ],
+      ...(params.onChunk ? { stream: true } : {}),
     };
   }
 
   async complete(params: CompletionParams): Promise<string> {
-    let res: Response;
-    try {
-      res = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(this.buildBody(params)),
-      });
-    } catch (err) {
-      // Transport-level failure (DNS, refused, timeout, …) — no HTTP status.
-      throw classifyLlmError({
-        config: this.config,
-        cause: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const res = await postCompletion({
+      config: this.config,
+      fetchImpl: this.fetchImpl,
+      url: `${this.baseUrl}/chat/completions`,
+      headers: { authorization: `Bearer ${this.apiKey}` },
+      body: this.buildBody(params),
+      signal: params.signal,
+    });
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw classifyLlmError({
-        config: this.config,
-        status: res.status,
-        cause: detail.slice(0, 500),
-      });
+    if (params.onChunk && isEventStream(res)) {
+      return consumeStream(this.config, res.body!, openAiDelta, params.onChunk);
     }
+    return this.parseOneShot(res, params.onChunk);
+  }
 
+  /**
+   * Plain JSON response — the non-streaming call, or a compat server that
+   * ignored `stream: true`. In the latter case the caller still gets one late
+   * chunk so the preview isn't blank.
+   */
+  private async parseOneShot(
+    res: Response,
+    onChunk?: (text: string) => void,
+  ): Promise<string> {
     let json: ChatCompletionResponse;
     try {
       json = (await res.json()) as ChatCompletionResponse;
@@ -82,6 +83,8 @@ export class OpenAiProvider implements LlmProvider {
       });
     }
 
-    return (json.choices?.[0]?.message?.content ?? "").trim();
+    const text = (json.choices?.[0]?.message?.content ?? "").trim();
+    onChunk?.(text);
+    return text;
   }
 }

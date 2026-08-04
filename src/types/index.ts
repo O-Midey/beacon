@@ -23,7 +23,8 @@ export type BeaconErrorCode =
   | "BAD_REQUEST"
   | "VALIDATION_ERROR"
   | "PORT_IN_USE"
-  | "ALREADY_RUNNING";
+  | "ALREADY_RUNNING"
+  | "CANCELLED";
 
 /**
  * Base error for all Beacon failures. Carries a machine-readable `code` so

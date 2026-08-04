@@ -43,6 +43,10 @@ export interface CompletionRequest {
   system: string;
   user: string;
   maxTokens?: number;
+  /** Stream text deltas as they arrive (turns on the provider's SSE path). */
+  onChunk?: (text: string) => void;
+  /** Cancels the request/stream; surfaces as a CANCELLED BeaconError. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -50,10 +54,16 @@ export interface CompletionRequest {
  * text. Throws BeaconError(API_ERROR) on transport failure or empty response.
  */
 export async function complete(req: CompletionRequest): Promise<string> {
-  const { config, system, user, maxTokens = 2048 } = req;
+  const { config, system, user, maxTokens = 2048, onChunk, signal } = req;
   if (!provider) provider = createProvider(config);
 
-  const text = await provider.complete({ system, user, maxTokens });
+  const text = await provider.complete({
+    system,
+    user,
+    maxTokens,
+    ...(onChunk ? { onChunk } : {}),
+    ...(signal ? { signal } : {}),
+  });
   if (!text) {
     throw new BeaconError(`${provider.name} provider returned no text content`, "API_ERROR");
   }
