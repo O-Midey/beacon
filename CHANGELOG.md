@@ -8,10 +8,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Watch your drafts write themselves.** `beacon draft` (and a manual
+  `beacon run`) now stream the model's output live: an activity line with a
+  pulsing ✦, elapsed time, and a rolling preview of the post being written —
+  platform by platform — instead of a silent spinner. Works with Anthropic,
+  OpenAI-compatible endpoints, and Ollama; if a proxy doesn't support
+  streaming, Beacon falls back to the old behavior automatically.
+- **A stage-by-stage checklist.** Each pipeline stage now reports what it
+  found as it completes: files and lines changed, whether the secret scan came
+  back clean, the significance score with the model's reasoning, and how many
+  platforms were drafted.
+- **Ctrl-C now cancels a draft cleanly.** Cancelling mid-draft aborts the API
+  request (no tokens wasted on output you'll never see), queues nothing, and
+  exits without leaving the terminal in a broken state.
 - **Reddit and Medium platforms** (opt-in: `beacon config set platform reddit on`,
   `beacon config set platform medium on`). Reddit drafts a title and a
   self-post body for a technical subreddit; Medium drafts a full story with
   title, optional subtitle, tags, and body.
+
+### Changed
+
+- **Every command opens and closes the same way** — the ✦ beacon wordmark up
+  top, a clear outcome line at the end. `beacon serve` got a readable API
+  table; `beacon doctor` ends with a proper verdict.
 
 ### Removed
 

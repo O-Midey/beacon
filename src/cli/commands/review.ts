@@ -3,12 +3,13 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import clipboard from "clipboardy";
-import { c } from "../../lib/colors.js";
+import { c, isInteractive } from "../../lib/colors.js";
 import { parseEdited, serializeForEdit } from "../../lib/edit.js";
 import { draftPlatforms, formatPlatform, platformLabel } from "../../lib/format.js";
 import { logger } from "../../lib/logger.js";
 import { confirm, intro, log, outro, select } from "../../lib/prompts.js";
-import { rule, sectionLabel } from "../../lib/ui.js";
+import { rule, scoreColor, sectionLabel } from "../../lib/ui.js";
+import { runReviewTui } from "./review-tui.js";
 import {
   loadQueue,
   mutateQueue,
@@ -42,12 +43,6 @@ import {
 const CHAR_LIMIT: Partial<Record<PlatformName, number>> = {
   twitter: 280, // per tweet
 };
-
-function scoreColor(score: number): (s: string) => string {
-  if (score >= 8) return c.success;
-  if (score >= 6) return c.accent;
-  return c.dim;
-}
 
 function printSummary(entry: QueueEntry): void {
   const s = entry.significance;
@@ -150,6 +145,13 @@ async function copyToClipboard(platform: PlatformName, draftSet: DraftSet): Prom
 type Action = "approve" | "edit" | "discard" | "skip";
 
 export async function reviewCommand(): Promise<void> {
+  // Full-screen TUI when running in an interactive terminal.
+  if (isInteractive() && process.stdout.isTTY) {
+    await runReviewTui(loadQueue().entries);
+    return;
+  }
+
+  // Non-TTY fallback: linear prompt flow (used when piped or in scripts).
   let queue = loadQueue();
   const pending = pendingEntries(queue);
 

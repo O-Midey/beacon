@@ -2,6 +2,7 @@ import { openBrowser } from "../../lib/browser.js";
 import { c } from "../../lib/colors.js";
 import { isProcessAlive } from "../../lib/lock.js";
 import { logger } from "../../lib/logger.js";
+import { banner, closing } from "../../lib/ui.js";
 import { readServeState } from "../../server/state.js";
 import { startLocalApi, waitForShutdown, type ServeOptions } from "./serve.js";
 
@@ -37,13 +38,13 @@ function uiUrl(port: number, token: string): string {
 }
 
 export async function uiCommand(options: ServeOptions): Promise<void> {
+  banner("ui");
   const existing = readServeState();
   if (existing && isProcessAlive(existing.pid) && (await isHealthy(existing.port))) {
     const url = uiUrl(existing.port, existing.token);
     openBrowser(url);
-    logger.success(
-      `Attached to the running beacon serve (pid ${existing.pid}) — opened ${c.code(url)}`,
-    );
+    logger.success(`Attached to the running beacon serve ${c.dim(`(pid ${existing.pid})`)}`);
+    closing(`Review UI open — ${c.code(url)}`);
     return;
   }
 
@@ -51,9 +52,9 @@ export async function uiCommand(options: ServeOptions): Promise<void> {
   const url = uiUrl(api.port, api.token);
 
   logger.success(`Beacon UI running at ${c.code(url)}`);
-  logger.info("Press Ctrl-C to stop.");
+  logger.plain(c.dim("Press ctrl-c to stop."));
   openBrowser(url);
 
   await waitForShutdown(api);
-  logger.info("Beacon UI stopped.");
+  closing("Beacon UI stopped.");
 }
