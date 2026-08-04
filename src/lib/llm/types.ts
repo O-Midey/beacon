@@ -10,6 +10,14 @@ export interface CompletionParams {
   system: string;
   user: string;
   maxTokens: number;
+  /**
+   * When present, the provider streams the completion and invokes this with
+   * each text delta as it arrives (the full text is still returned). Absent →
+   * the plain one-shot request path (significance, doctor ping).
+   */
+  onChunk?: (text: string) => void;
+  /** Cancels the request/stream; surfaces as a CANCELLED BeaconError. */
+  signal?: AbortSignal;
 }
 
 export interface LlmProvider {

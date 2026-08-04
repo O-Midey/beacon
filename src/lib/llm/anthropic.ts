@@ -1,13 +1,14 @@
 import { BeaconError, type BeaconConfig } from "../../types/index.js";
 import { resolveApiKey } from "../config.js";
 import { resolveBaseUrl } from "./endpoints.js";
-import { classifyLlmError } from "./errors.js";
+import { anthropicDelta } from "./sse.js";
+import { consumeStream, isEventStream, postCompletion } from "./transport.js";
 import type { CompletionParams, LlmProvider } from "./types.js";
 
 /**
  * Anthropic provider using the Messages API over `fetch`. No SDK dependency —
- * Beacon only ever makes a single-turn, non-streaming completion, which the
- * raw endpoint covers in a few lines.
+ * Beacon only makes single-turn completions, optionally streamed (SSE) when
+ * the caller wants live deltas, which the raw endpoint covers in a few lines.
  *
  * `baseUrl` overrides the endpoint for proxies and gateways, mirroring the
  * OpenAI provider. It replaces the SDK's implicit `ANTHROPIC_BASE_URL` support.
@@ -45,38 +46,34 @@ export class AnthropicProvider implements LlmProvider {
       max_tokens: params.maxTokens,
       system: params.system,
       messages: [{ role: "user", content: params.user }],
+      ...(params.onChunk ? { stream: true } : {}),
     };
   }
 
   async complete(params: CompletionParams): Promise<string> {
-    let res: Response;
-    try {
-      res = await this.fetchImpl(`${this.baseUrl}/messages`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": this.apiKey,
-          "anthropic-version": API_VERSION,
-        },
-        body: JSON.stringify(this.buildBody(params)),
-      });
-    } catch (err) {
-      // Transport-level failure (DNS, refused, timeout, …) — no HTTP status.
-      throw classifyLlmError({
-        config: this.config,
-        cause: err instanceof Error ? err.message : String(err),
-      });
-    }
+    const res = await postCompletion({
+      config: this.config,
+      fetchImpl: this.fetchImpl,
+      url: `${this.baseUrl}/messages`,
+      headers: { "x-api-key": this.apiKey, "anthropic-version": API_VERSION },
+      body: this.buildBody(params),
+      signal: params.signal,
+    });
 
-    if (!res.ok) {
-      const detail = await res.text().catch(() => "");
-      throw classifyLlmError({
-        config: this.config,
-        status: res.status,
-        cause: detail.slice(0, 500),
-      });
+    if (params.onChunk && isEventStream(res)) {
+      return consumeStream(this.config, res.body!, anthropicDelta, params.onChunk);
     }
+    return this.parseOneShot(res, params.onChunk);
+  }
 
+  /**
+   * Plain JSON response — the non-streaming call, or a proxy that ignored
+   * `stream: true`. In the latter case the caller still gets one late chunk.
+   */
+  private async parseOneShot(
+    res: Response,
+    onChunk?: (text: string) => void,
+  ): Promise<string> {
     let json: MessagesResponse;
     try {
       json = (await res.json()) as MessagesResponse;
@@ -86,10 +83,12 @@ export class AnthropicProvider implements LlmProvider {
       });
     }
 
-    return (json.content ?? [])
+    const text = (json.content ?? [])
       .filter((block) => block.type === "text")
       .map((block) => block.text ?? "")
       .join("")
       .trim();
+    onChunk?.(text);
+    return text;
   }
 }

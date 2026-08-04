@@ -208,3 +208,167 @@ describe("AnthropicProvider", () => {
     });
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/*  Streaming                                                                 */
+/* -------------------------------------------------------------------------- */
+
+/** Build an SSE Response streaming the given raw chunks. */
+function sseResponse(chunks: string[]): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    status: 200,
+    headers: { "content-type": "text/event-stream" },
+  });
+}
+
+const anthropicSse = (texts: string[]) => [
+  'event: message_start\ndata: {"type":"message_start"}\n\n',
+  ...texts.map(
+    (t) =>
+      `event: content_block_delta\ndata: ${JSON.stringify({
+        delta: { type: "text_delta", text: t },
+      })}\n\n`,
+  ),
+  'event: message_stop\ndata: {"type":"message_stop"}\n\n',
+];
+
+const openAiSse = (texts: string[]) => [
+  ...texts.map((t) => `data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`),
+  "data: [DONE]\n\n",
+];
+
+describe("streaming completions", () => {
+  it("Anthropic: accumulates deltas and fires onChunk in order", async () => {
+    const fetchMock = vi.fn(async () => sseResponse(anthropicSse(["hel", "lo ", "world"])));
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    const chunks: string[] = [];
+    const out = await p.complete({
+      system: "s",
+      user: "u",
+      maxTokens: 10,
+      onChunk: (t) => chunks.push(t),
+    });
+    expect(out).toBe("hello world");
+    expect(chunks).toEqual(["hel", "lo ", "world"]);
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.stream).toBe(true);
+  });
+
+  it("OpenAI: accumulates deltas, tolerates a missing [DONE]", async () => {
+    const withoutDone = openAiSse(["a", "b"]).slice(0, -1);
+    const fetchMock = vi.fn(async () => sseResponse(withoutDone));
+    const p = new OpenAiProvider(
+      cfg({ provider: "openai", model: "x" }),
+      fetchMock as unknown as typeof fetch,
+    );
+    const chunks: string[] = [];
+    const out = await p.complete({
+      system: "s",
+      user: "u",
+      maxTokens: 10,
+      onChunk: (t) => chunks.push(t),
+    });
+    expect(out).toBe("ab");
+    expect(chunks).toEqual(["a", "b"]);
+  });
+
+  it("does not request streaming without an onChunk callback", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "plain" } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const p = new OpenAiProvider(
+      cfg({ provider: "openai", model: "x" }),
+      fetchMock as unknown as typeof fetch,
+    );
+    await p.complete({ system: "s", user: "u", maxTokens: 10 });
+    const body = JSON.parse((fetchMock.mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.stream).toBeUndefined();
+  });
+
+  it("falls back to one-shot (single late chunk) when the server ignores stream:true", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "whole thing" } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const p = new OpenAiProvider(
+      cfg({ provider: "openai", model: "x" }),
+      fetchMock as unknown as typeof fetch,
+    );
+    const chunks: string[] = [];
+    const out = await p.complete({
+      system: "s",
+      user: "u",
+      maxTokens: 10,
+      onChunk: (t) => chunks.push(t),
+    });
+    expect(out).toBe("whole thing");
+    expect(chunks).toEqual(["whole thing"]);
+  });
+
+  it("classifies a mid-stream Anthropic error event as API_ERROR", async () => {
+    const fetchMock = vi.fn(async () =>
+      sseResponse([
+        ...anthropicSse(["partial"]).slice(0, 2),
+        'event: error\ndata: {"type":"error","error":{"type":"overloaded_error"}}\n\n',
+      ]),
+    );
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(
+      p.complete({ system: "s", user: "u", maxTokens: 10, onChunk: () => {} }),
+    ).rejects.toMatchObject({ code: "API_ERROR" });
+  });
+
+  it("maps an aborted request to CANCELLED, not NETWORK_ERROR", async () => {
+    const fetchMock = vi.fn(async () => {
+      const err = new Error("This operation was aborted");
+      err.name = "AbortError";
+      throw err;
+    });
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      p.complete({
+        system: "s",
+        user: "u",
+        maxTokens: 10,
+        onChunk: () => {},
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({ code: "CANCELLED" });
+  });
+
+  it("maps a mid-stream abort to CANCELLED", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            'event: content_block_delta\ndata: {"delta":{"type":"text_delta","text":"a"}}\n\n',
+          ),
+        );
+        const err = new Error("aborted mid-stream");
+        err.name = "AbortError";
+        controller.error(err);
+      },
+    });
+    const fetchMock = vi.fn(async () =>
+      new Response(stream, { status: 200, headers: { "content-type": "text/event-stream" } }),
+    );
+    const p = new AnthropicProvider(cfg({ model: "x" }), fetchMock as unknown as typeof fetch);
+    await expect(
+      p.complete({ system: "s", user: "u", maxTokens: 10, onChunk: () => {} }),
+    ).rejects.toMatchObject({ code: "CANCELLED" });
+  });
+});
