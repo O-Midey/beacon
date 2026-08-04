@@ -511,7 +511,6 @@ function entryCard(entry: WireEntry): HTMLElement {
   const head = h(
     "div",
     { class: "card-head" },
-    h("span", { class: "repo", text: entry.snapshot.repoName }),
     h("span", { class: "hash", text: entry.snapshot.commitHash.slice(0, 10) }),
     h("span", { class: "score", text: `${entry.significance.score}/10` }),
   );
@@ -630,6 +629,41 @@ function sortEntries(entries: WireEntry[], sort: Sort): WireEntry[] {
   }
 }
 
+interface RepoGroup {
+  repo: string;
+  entries: WireEntry[];
+}
+
+/**
+ * Buckets entries by repo, preserving each repo's first-appearance position
+ * in `entries` — so whatever the active sort produced (newest/score/etc.)
+ * still decides group order, and entries within a group stay in that order.
+ */
+function groupByRepo(entries: WireEntry[]): RepoGroup[] {
+  const order: string[] = [];
+  const buckets = new Map<string, WireEntry[]>();
+  for (const entry of entries) {
+    const repo = entry.snapshot.repoName;
+    let bucket = buckets.get(repo);
+    if (!bucket) {
+      bucket = [];
+      buckets.set(repo, bucket);
+      order.push(repo);
+    }
+    bucket.push(entry);
+  }
+  return order.map((repo) => ({ repo, entries: buckets.get(repo)! }));
+}
+
+function repoGroupHeader(repo: string, count: number): HTMLElement {
+  return h(
+    "div",
+    { class: "repo-group-head" },
+    h("span", { class: "repo-group-name", text: `▸ ${repo}` }),
+    h("span", { class: "repo-group-count", text: `${count} ${count === 1 ? "draft" : "drafts"}` }),
+  );
+}
+
 const EMPTY_COPY: Record<Filter, { title: string; body: string; code: string | null }> = {
   pending: {
     title: "Queue clear.",
@@ -743,7 +777,12 @@ function render(): void {
     wrap.append(emptyView(state.filter));
     return;
   }
-  for (const entry of visible) wrap.append(entryCard(entry));
+  for (const group of groupByRepo(visible)) {
+    const section = h("section", { class: "repo-group" });
+    section.append(repoGroupHeader(group.repo, group.entries.length));
+    for (const entry of group.entries) section.append(entryCard(entry));
+    wrap.append(section);
+  }
 }
 
 /* ---------------------------------- live ---------------------------------- */
