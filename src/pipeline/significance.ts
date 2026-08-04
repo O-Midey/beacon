@@ -59,12 +59,14 @@ export async function assessSignificance(
   snapshot: WorkspaceSnapshot,
   redactedDiff: string,
   config: BeaconConfig,
+  signal?: AbortSignal,
 ): Promise<SignificanceResult> {
   const text = await complete({
     config,
     system: SYSTEM_PROMPT,
     user: buildSignificancePrompt(snapshot, redactedDiff),
     maxTokens: 512,
+    ...(signal ? { signal } : {}),
   });
 
   const json = extractJson(text);

@@ -132,3 +132,88 @@ describe("runPipeline redacts every LLM-visible surface", () => {
     expect(loadQueue().entries[0]!.snapshot.commitMessage).toBe("feat: add a thing");
   });
 });
+
+describe("runPipeline progress events", () => {
+  let dir: string;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "beacon-pipeline-"));
+    process.env.BEACON_HOME = dir;
+    completeMock.mockReset();
+    completeMock.mockResolvedValueOnce(SIGNIFICANCE).mockResolvedValueOnce(DRAFTS);
+  });
+
+  afterEach(() => {
+    delete process.env.BEACON_HOME;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("emits start/complete pairs for every stage, in order, with details", async () => {
+    const events: import("../../src/pipeline/index.js").PipelineEvent[] = [];
+    let t = 0;
+    const snapshot = snapshotWith("feat: add a thing", "+const x = 1;");
+
+    await runPipeline(config, {
+      snapshot,
+      onEvent: (e) => events.push(e),
+      clock: () => (t += 10), // strictly increasing → every duration is 10ms
+    });
+
+    const staged = events.filter((e) => e.type !== "llm:chunk");
+    expect(staged.map((e) => `${e.type}:${e.type === "llm:chunk" ? "" : e.stage}`)).toEqual([
+      "stage:start:capture",
+      "stage:complete:capture",
+      "stage:start:safety",
+      "stage:complete:safety",
+      "stage:start:significance",
+      "stage:complete:significance",
+      "stage:start:draft",
+      "stage:complete:draft",
+      "stage:start:queue",
+      "stage:complete:queue",
+    ]);
+
+    const complete = events.filter((e) => e.type === "stage:complete");
+    expect(complete[0]).toMatchObject({
+      detail: { stage: "capture", files: 1, insertions: 1, deletions: 0 },
+      durationMs: 10,
+    });
+    expect(complete[1]).toMatchObject({ detail: { stage: "safety", safe: true, findings: 0 } });
+    expect(complete[2]).toMatchObject({
+      detail: { stage: "significance", score: 9, isSignificant: true },
+    });
+    expect(complete[3]).toMatchObject({ detail: { stage: "draft", platforms: 3 } });
+    expect(complete[4]).toMatchObject({ detail: { stage: "queue" } });
+  });
+
+  it("forwards drafter deltas as llm:chunk events when someone listens", async () => {
+    completeMock.mockReset();
+    completeMock
+      .mockResolvedValueOnce(SIGNIFICANCE)
+      .mockImplementationOnce(async (req) => {
+        const { onChunk } = req as { onChunk?: (t: string) => void };
+        onChunk?.("{\"twitter\"");
+        onChunk?.(":{}}");
+        return DRAFTS;
+      });
+    const chunks: string[] = [];
+    const snapshot = snapshotWith("feat: x", "+1");
+
+    await runPipeline(config, {
+      snapshot,
+      onEvent: (e) => {
+        if (e.type === "llm:chunk") chunks.push(e.text);
+      },
+    });
+
+    expect(chunks).toEqual(['{"twitter"', ":{}}"]);
+  });
+
+  it("does not request streaming when nobody listens (silent hook path)", async () => {
+    const snapshot = snapshotWith("feat: x", "+1");
+    await runPipeline(config, { snapshot });
+
+    const drafterCall = completeMock.mock.calls[1]![0] as { onChunk?: unknown };
+    expect(drafterCall.onChunk).toBeUndefined();
+  });
+});
