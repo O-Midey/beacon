@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { c } from "./colors.js";
+import { writeAboveRegion } from "./live/region.js";
 import { beaconLogPath, ensureBeaconHome, FILE_MODE } from "./paths.js";
 
 /**
@@ -127,26 +128,30 @@ export function logToFile(level: string, message: string): void {
   }
 }
 
+// All stream writes route through the live region (lib/live/region.ts): when
+// the live renderer owns the bottom of the terminal, a durable line must lift
+// the region out of the way instead of tearing through a mid-repaint frame.
+// With no region active this is a plain stream write.
 export const logger = {
   /** Success message to stdout. */
   success(message: string): void {
-    process.stdout.write(`${symbols.success} ${message}\n`);
+    writeAboveRegion(process.stdout, `${symbols.success} ${message}\n`);
   },
   /** Informational message to stdout. */
   info(message: string): void {
-    process.stdout.write(`${symbols.info} ${message}\n`);
+    writeAboveRegion(process.stdout, `${symbols.info} ${message}\n`);
   },
   /** Warning to stderr. */
   warn(message: string): void {
-    process.stderr.write(`${symbols.warn} ${message}\n`);
+    writeAboveRegion(process.stderr, `${symbols.warn} ${message}\n`);
   },
   /** Error to stderr. */
   error(message: string): void {
-    process.stderr.write(`${symbols.error} ${message}\n`);
+    writeAboveRegion(process.stderr, `${symbols.error} ${message}\n`);
   },
   /** Plain line to stdout (no symbol). */
   plain(message: string): void {
-    process.stdout.write(`${message}\n`);
+    writeAboveRegion(process.stdout, `${message}\n`);
   },
   /** Append to the persistent log file only. */
   file: logToFile,
