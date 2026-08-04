@@ -107,11 +107,19 @@ export function selectEnabledDrafts(
  * platform drafts; `generatedAt` and `commitHash` are stamped locally.
  * Zod-validated.
  */
+export interface DraftStreamOptions {
+  /** Live text deltas of the raw completion (for the streaming preview). */
+  onChunk?: ((text: string) => void) | undefined;
+  /** Cancels the LLM call; surfaces as a CANCELLED BeaconError. */
+  signal?: AbortSignal | undefined;
+}
+
 export async function draft(
   snapshot: WorkspaceSnapshot,
   significance: SignificanceResult,
   safety: SafetyScanResult,
   config: BeaconConfig,
+  stream: DraftStreamOptions = {},
 ): Promise<DraftSet> {
   if (enabledPlatformConfigs(config).length === 0) {
     throw new BeaconError(
@@ -125,6 +133,8 @@ export async function draft(
     system: buildSystemPrompt(config),
     user: buildDrafterPrompt(snapshot, significance, safety),
     maxTokens: 4096,
+    ...(stream.onChunk ? { onChunk: stream.onChunk } : {}),
+    ...(stream.signal ? { signal: stream.signal } : {}),
   });
 
   const json = extractJson(text);
