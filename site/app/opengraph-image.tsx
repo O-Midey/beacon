@@ -17,7 +17,7 @@ export default function OpenGraphImage() {
           background: "#F4F4F0",
           border: "16px solid #000",
           padding: "64px 72px",
-          fontFamily: "Helvetica, Arial, sans-serif",
+          fontFamily: "Space Grotesk, sans-serif",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 36 }}>

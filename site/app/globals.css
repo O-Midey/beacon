@@ -7,7 +7,7 @@
   --dark: #171714;
   --term-fg: #e8e6df;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --sans: var(--font-space-grotesk), sans-serif;
 }
 * { box-sizing: border-box; margin: 0; }
 html { scroll-padding-top: 96px; -webkit-text-size-adjust: 100%; }
