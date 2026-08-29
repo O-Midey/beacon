@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Review your drafts in VS Code.** A new companion extension — **Beacon —
+  Review** — brings the queue into your editor. Pending drafts show up in the
+  sidebar grouped by repository and commit; open one to read every platform's
+  version side by side, edit inline, and approve (which copies the post to your
+  clipboard) without switching windows. A badge on the activity-bar icon counts
+  what's waiting and ticks up live as you commit. It drives the same local queue
+  as `beacon review` and `beacon ui` — install "Beacon — Review" from the VS
+  Code Marketplace.
+
 ## [0.6.0] - 2026-08-04
 
 ### Added
