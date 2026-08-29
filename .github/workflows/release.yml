@@ -88,3 +88,59 @@ jobs:
         run: npm publish --provenance --access public ${{ inputs.dry_run && '--dry-run' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-extension:
+    name: Publish VS Code extension
+    runs-on: ubuntu-latest
+    # Independent of the npm job: a different artifact and Marketplace, versioned
+    # separately (extension/package.json). If VSCE_PAT is unset the job packages
+    # the VSIX and stops — a release never fails because the extension has no
+    # token configured yet.
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      # The extension packages the built UI bundle, so build it from the repo
+      # root first; `vscode:prepublish` then copies dist/ui into the VSIX.
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build UI bundle
+        run: npm run build
+
+      - name: Install extension dependencies
+        run: npm ci
+        working-directory: extension
+
+      - name: Package or publish the extension
+        working-directory: extension
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ -z "$VSCE_PAT" ]; then
+            echo "::warning::VSCE_PAT not set — packaging the VSIX only, skipping Marketplace publish."
+            npm run package
+          elif [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run — packaging the VSIX without publishing."
+            npm run package
+          else
+            npm run publish
+          fi
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: beacon-review-vsix
+          path: extension/*.vsix
+          if-no-files-found: warn
