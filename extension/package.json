@@ -1,8 +1,8 @@
 {
   "name": "beacon-review",
   "displayName": "Beacon — Review",
-  "description": "Review, edit, and approve your build-in-public drafts from inside VS Code.",
-  "version": "0.0.2",
+  "description": "Review, edit, and approve the social posts Beacon drafts from your git commits — for X, LinkedIn, dev.to, Reddit, and Medium — without leaving VS Code.",
+  "version": "0.0.3",
   "publisher": "Omotosho",
   "private": true,
   "license": "MIT",

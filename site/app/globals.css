@@ -105,6 +105,9 @@ a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px soli
 .cmd-copy { border: 2px solid #000; border-left: none; background: var(--y); color: #000; padding: 14px 18px; font-weight: 800; font-size: 14px; cursor: pointer; box-shadow: 5px 5px 0 #000; font-family: var(--sans); transition: transform 0.12s ease, box-shadow 0.12s ease; }
 @media (hover: hover) { .cmd-copy:hover { transform: translate(4px, 4px); box-shadow: 0 0 0 rgba(0, 0, 0, 0); } }
 .cmd-copy:active { transform: translate(4px, 4px); box-shadow: 0 0 0 rgba(0, 0, 0, 0); }
+.vscode-cta { display: inline-flex; align-items: center; gap: 10px; background: var(--t); color: #fff; font-weight: 700; font-size: clamp(13px, 2.4vw, 15px); padding: 10px 14px; margin-bottom: 22px; rotate: -1deg; }
+.vscode-cta-tag { background: var(--y); color: #000; font-weight: 800; font-size: 11px; letter-spacing: 0.04em; padding: 2px 7px; border: 2px solid #000; }
+.vscode-cta-arrow { font-weight: 800; font-size: 16px; }
 @keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.14); } 100% { transform: scale(1); } }
 .copied-pop { animation: pop 0.3s ease; }
 
