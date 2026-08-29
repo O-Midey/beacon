@@ -20,7 +20,9 @@ import type {
  * Deliberately framework-free and dependency-free: this bundle is reused by
  * the VS Code webview and the Tauri shell in later phases, so it must carry
  * nothing but the DOM. All node creation goes through `h()`/`textContent` —
- * draft content is LLM output and must never be parsed as markup.
+ * draft content is LLM output and must never be parsed as markup. The only
+ * host-specific inputs — the API origin and session token — are resolved once
+ * through `resolveHost()`, so the same bytes run same-origin or embedded.
  *
  * Error handling follows the house rules: one fetch wrapper is the only place
  * raw HTTP becomes `ApiError`, and every branch decides on `code`, never on
@@ -72,12 +74,55 @@ class ApiError extends Error {
   }
 }
 
-const token = new URLSearchParams(location.hash.slice(1)).get("token") ?? "";
+/* --------------------------------- host ---------------------------------- */
+/**
+ * Host seam. The same bundle runs in three shells (design/ROADMAP.md): a
+ * browser tab served by `beacon serve`, a VS Code webview, and a Tauri window.
+ * Only the browser tab is same-origin with the API and can carry the token in
+ * the URL fragment; the embedded shells load this bundle from their own origin
+ * (`vscode-webview://…`, `tauri://localhost`) and must tell it where the API
+ * lives and which token to use, by defining `globalThis.__BEACON__` before the
+ * bundle runs.
+ *
+ * `apiBase` is "" for the same-origin tab (relative paths hit the server) and
+ * an absolute `http://127.0.0.1:PORT` origin for the embedded shells. It never
+ * carries a trailing slash, so `apiBase + "/queue"` is always well-formed.
+ */
+interface HostConfig {
+  apiBase: string;
+  token: string;
+  /**
+   * Detail mode (VS Code hybrid shell): render only this entry, chromeless.
+   * Absent in the browser tab and the full webview, which show the whole queue.
+   * The host can also switch the focus at runtime via a `{ type: "focus" }`
+   * message, so selecting a different commit reuses the same panel.
+   */
+  focusEntryId?: string;
+}
+
+function resolveHost(): HostConfig {
+  const injected = (globalThis as { __BEACON__?: Partial<HostConfig> }).__BEACON__;
+  if (injected && typeof injected.token === "string") {
+    return {
+      apiBase: (injected.apiBase ?? "").replace(/\/+$/, ""),
+      token: injected.token,
+      ...(injected.focusEntryId ? { focusEntryId: injected.focusEntryId } : {}),
+    };
+  }
+  // Browser tab: same-origin API, token in the URL fragment.
+  return {
+    apiBase: "",
+    token: new URLSearchParams(location.hash.slice(1)).get("token") ?? "",
+  };
+}
+
+const host = resolveHost();
+const token = host.token;
 
 async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(path, {
+    res = await fetch(host.apiBase + path, {
       ...init,
       headers: { authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
     });
@@ -111,6 +156,8 @@ interface State {
   sort: Sort;
   connected: boolean;
   gate: "ok" | "no-token" | "bad-token";
+  /** Detail mode: render only this entry, chromeless. `null` = full queue. */
+  focus: string | null;
 }
 
 const state: State = {
@@ -120,6 +167,7 @@ const state: State = {
   sort: "newest",
   connected: false,
   gate: token === "" ? "no-token" : "ok",
+  focus: host.focusEntryId ?? null,
 };
 
 /**
@@ -194,6 +242,34 @@ function h<K extends keyof HTMLElementTagNameMap>(
 }
 
 const root = document.getElementById("app")!;
+
+/**
+ * The Beacon lighthouse mark, mirroring `site/components/Logo.tsx` exactly so
+ * every shell shows the same logo as the site. Built with `createElementNS`
+ * (SVG is a different namespace than `h()`'s HTML). The two beams keep the
+ * `beam` class so the site's pulse animation applies here too.
+ */
+function logoMark(): SVGSVGElement {
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", "26");
+  svg.setAttribute("height", "26");
+  svg.setAttribute("viewBox", "0 0 32 32");
+  svg.setAttribute("aria-hidden", "true");
+  const add = (tag: string, attrs: Record<string, string>, cls?: string): void => {
+    const node = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (cls !== undefined) node.setAttribute("class", cls);
+    svg.append(node);
+  };
+  add("path", { d: "M10 9 L3 5", stroke: "#000", "stroke-width": "2", "stroke-linecap": "round" }, "beam");
+  add("path", { d: "M22 9 L29 5", stroke: "#000", "stroke-width": "2", "stroke-linecap": "round" }, "beam beam-r");
+  add("rect", { x: "12", y: "6", width: "8", height: "6", fill: "#ff90e8", stroke: "#000", "stroke-width": "2" });
+  add("path", { d: "M13 12 L19 12 L21.5 29 L10.5 29 Z", fill: "#ffc900", stroke: "#000", "stroke-width": "2" });
+  add("path", { d: "M12 18 L20 18", stroke: "#000", "stroke-width": "2" });
+  add("path", { d: "M11.2 23.5 L20.8 23.5", stroke: "#000", "stroke-width": "2" });
+  return svg;
+}
 
 function toast(message: string, kind: "ok" | "err" = "ok"): void {
   let host = document.querySelector<HTMLDivElement>(".toasts");
@@ -695,14 +771,60 @@ function emptyView(filter: Filter): HTMLElement {
   return box;
 }
 
+/** A slim header for detail mode — the mark and the connection pill only. */
+function focusHeader(): HTMLElement {
+  const logo = h("div", { class: "logo" }, logoMark(), "BEACON", h("span", { class: "mini-badge", text: "detail" }));
+  const conn = h(
+    "span",
+    { class: state.connected ? "conn" : "conn off" },
+    h("span", { class: "dot" }),
+    state.connected ? "LIVE" : "OFFLINE",
+  );
+  return h("header", { class: "site-head" }, h("div", { class: "head-row" }, logo, h("div", { class: "head-right" }, conn)));
+}
+
+/**
+ * Detail mode (the VS Code hybrid shell): render just the focused entry, with
+ * no tabs or repo grouping. Reuses `entryCard`, so editing, copy, and
+ * approve/discard behave exactly as in the full queue.
+ */
+function renderFocus(id: string): void {
+  root.append(focusHeader());
+  if (!state.connected && state.gate === "ok") {
+    root.append(h("div", { class: "banner", text: "SERVER UNREACHABLE — reconnecting…" }));
+  }
+  const wrap = h("main", { class: "wrap" });
+  root.append(wrap);
+  if (state.gate !== "ok") {
+    wrap.append(gateView(state.gate));
+    return;
+  }
+  const entry = state.entries.find((e) => e.id === id);
+  if (!entry) {
+    const box = h("div", { class: "big-box" });
+    box.append(
+      h("h2", { text: "Draft unavailable" }),
+      h("p", { text: "This draft is no longer in the queue." }),
+    );
+    wrap.append(box);
+    return;
+  }
+  wrap.append(entryCard(entry));
+}
+
 function render(): void {
   root.textContent = "";
+
+  if (state.focus !== null) {
+    renderFocus(state.focus);
+    return;
+  }
 
   // Header
   const logo = h(
     "div",
     { class: "logo" },
-    h("span", { class: "beam", text: "▲" }),
+    logoMark(),
     "BEACON",
     h("span", { class: "mini-badge", text: "review" }),
   );
@@ -789,7 +911,7 @@ function render(): void {
 
 function connectEvents(): void {
   if (token === "") return;
-  const source = new EventSource(`/events?token=${encodeURIComponent(token)}`);
+  const source = new EventSource(`${host.apiBase}/events?token=${encodeURIComponent(token)}`);
   source.addEventListener("open", () => {
     state.connected = true;
     void refresh();
@@ -803,6 +925,18 @@ function connectEvents(): void {
     }
   });
 }
+
+/**
+ * Detail mode: the host (the VS Code tree) can retarget the same panel at a
+ * different entry without a reload by posting `{ type: "focus", entryId }`.
+ */
+window.addEventListener("message", (event: MessageEvent) => {
+  const msg = event.data as { type?: string; entryId?: string | null } | null;
+  if (msg?.type === "focus") {
+    state.focus = msg.entryId ?? null;
+    render();
+  }
+});
 
 render();
 void refresh();
