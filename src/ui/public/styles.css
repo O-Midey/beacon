@@ -281,6 +281,9 @@ summary:focus-visible {
 .plat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
 .plat { border: 2px solid #000; min-width: 0; }
 .plat.wide { grid-column: 1 / -1; }
+/* Detail mode shows one entry with room to spare — give every platform the
+   full width instead of pairing narrow ones into columns. */
+.wrap-focus .plat-grid { grid-template-columns: 1fr; }
 .plat-head {
   display: flex;
   align-items: center;

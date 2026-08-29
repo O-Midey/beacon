@@ -793,7 +793,7 @@ function renderFocus(id: string): void {
   if (!state.connected && state.gate === "ok") {
     root.append(h("div", { class: "banner", text: "SERVER UNREACHABLE — reconnecting…" }));
   }
-  const wrap = h("main", { class: "wrap" });
+  const wrap = h("main", { class: "wrap wrap-focus" });
   root.append(wrap);
   if (state.gate !== "ok") {
     wrap.append(gateView(state.gate));
