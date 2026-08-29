@@ -43,6 +43,18 @@ export default function LandingPage() {
                   <CopyButton text={INSTALL} className="cmd-copy" />
                 </div>
 
+                <a
+                  className="vscode-cta press rise"
+                  href="https://marketplace.visualstudio.com/items?itemName=Omotosho.beacon-review"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ "--d": ".28s" } as React.CSSProperties}
+                >
+                  <span className="vscode-cta-tag">NEW</span>
+                  <span>VS&nbsp;Code extension — review, edit &amp; approve drafts in your editor</span>
+                  <span className="vscode-cta-arrow" aria-hidden="true">→</span>
+                </a>
+
                 <div className="plat-row rise" style={{ "--d": ".32s" } as React.CSSProperties} aria-label="Supported platforms">
                   <span className="plat-label">drafts for</span>
                   <span className="chip">𝕏 / Twitter</span>
