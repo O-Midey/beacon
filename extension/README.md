@@ -1,39 +1,46 @@
 # Beacon — Review
 
-**Turn your git commits into build-in-public posts — then review, edit, and approve them without leaving VS Code.**
-
-[Beacon](https://beacon-bip.vercel.app) is a local CLI that watches your commits, scans them for secrets, scores what's worth sharing, and drafts posts for **Twitter/X, LinkedIn, dev.to, Reddit, and Medium**. This extension is the review surface: every draft Beacon generates shows up in your editor, ready to read, edit, and approve.
+**Beacon turns your git commits into build-in-public posts. This extension is where you review them — inside VS Code.**
 
 ![Beacon review in VS Code](https://raw.githubusercontent.com/O-Midey/beacon/main/extension/media/hero.png)
 
-## What you can do
+## What is this?
 
-- **See every pending draft in a tree** — grouped by repository, then by commit, then by platform, with each commit's significance score. A badge on the Beacon activity-bar icon shows how many are waiting.
-- **Open a commit to read its drafts side by side** — selecting a commit opens a panel with its Twitter/X, LinkedIn, dev.to, Reddit, and Medium versions, each rendered as it'll be posted.
-- **Edit any draft in place** — tweak the hook, body, tweets, tags, or title and save; your edits persist in the queue.
-- **Approve, discard, or copy** — approve copies the post to your clipboard so you can paste it wherever you post; discard drops it; both work inline from the tree or the panel.
-- **Stay in sync automatically** — commit something and the new draft appears and the badge ticks up live, no refresh, no reopening.
+When you build in public, the hardest part is remembering to post — and writing the post. [Beacon](https://beacon-bip.vercel.app) is a small local tool that does the writing for you: after each meaningful commit, it drafts a post about what you shipped for **Twitter/X, LinkedIn, dev.to, Reddit, and Medium**.
 
-## How it works
+Those drafts don't get posted automatically. They wait for you to look them over — and that's what this extension is for. It shows every draft right in VS Code so you can read it, tweak it, and approve the ones you like.
 
-1. You commit. Beacon's git hook drafts posts for your enabled platforms.
-2. The drafts land in a local queue on your machine.
-3. Open the **Beacon** icon in VS Code, pick a commit, and review its drafts.
-4. Edit what you want, then **Approve** — the post is on your clipboard, ready to publish in your own voice.
+## How to use it
 
-## Local and private, by design
-
-Nothing leaves your machine. The extension talks only to a localhost server on your own computer, guarded by a per-session token, and starts it on demand. Drafts are **never auto-posted** — you always paste and publish them yourself.
-
-## Requirements
-
-This extension is the companion UI for the **Beacon CLI**. Install it once:
+**1. Install the Beacon CLI** (once, globally):
 
 ```sh
 npm install -g beacon-bip
 ```
 
-Then run `beacon init` in a repo and commit as usual, or draft on demand with `beacon draft`. If `beacon` isn't on your `PATH`, point the `beacon.cliPath` setting at it.
+**2. Set it up in a project:**
+
+```sh
+beacon init
+```
+
+This walks you through picking which platforms to draft for and which model to use. From now on, Beacon drafts a post whenever you make a significant commit. (Want to try it right away without committing? Run `beacon draft`.)
+
+**3. Open the review panel in VS Code.** Click the **Beacon** icon in the activity bar (the left-hand strip). You'll see your pending drafts as a tree — grouped by repository and commit. A number on the icon tells you how many are waiting.
+
+**4. Review a draft.** Click a commit to open its drafts for each platform, side by side. Read them, and **edit anything** you'd word differently.
+
+**5. Approve or discard.** **Approve** copies the finished post to your clipboard — paste it into X, LinkedIn, or wherever you post. **Discard** drops the ones you don't want.
+
+That's the whole loop: commit → Beacon drafts → you review → you post. In your voice, on your schedule.
+
+## Private by default
+
+Everything stays on your machine. The extension only talks to a local server on your own computer, and nothing is ever posted for you — approving just copies the text so *you* post it.
+
+## Need the CLI
+
+This extension is the review UI for the Beacon CLI, so make sure it's installed (`npm install -g beacon-bip`). If `beacon` isn't found, set the `beacon.cliPath` setting to its full path.
 
 ## Links
 
