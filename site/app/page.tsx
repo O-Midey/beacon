@@ -230,6 +230,73 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* VS CODE */}
+        <section id="vscode" className="sec">
+          <div className="wrap ui-grid">
+            <div className="reveal">
+              <span className="badge" style={{ background: "var(--y)", rotate: "-2deg" }}>vs code</span>
+              <h2 className="display title-gap-sm">Or never leave your editor.</h2>
+              <p className="lede-p">
+                The VS&nbsp;Code extension puts the same queue in your sidebar — browse drafts by
+                repo and commit, open one to read every platform side by side, and{" "}
+                <strong>approve without switching windows</strong>. A badge on the activity bar
+                counts what&apos;s waiting.
+              </p>
+              <ul className="rules">
+                <li>native tree → branded review panel</li>
+                <li>live badge → drafts appear as you commit</li>
+                <li>approve → copied to your clipboard, ready to post</li>
+              </ul>
+              <a
+                className="press vscode-get"
+                href="https://marketplace.visualstudio.com/items?itemName=Omotosho.beacon-review"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Get it on the Marketplace →
+              </a>
+            </div>
+
+            <div className="vscode-mock reveal" style={{ "--d": ".15s" } as React.CSSProperties}>
+              <div className="vsbar">
+                <span className="dot" style={{ background: "var(--p)" }} />
+                <span className="dot" style={{ background: "var(--y)" }} />
+                <span className="dot" style={{ background: "var(--t)" }} />
+                <span className="label">rocket-editor — VS Code</span>
+              </div>
+              <div className="vs-body">
+                <div className="vs-rail">
+                  <svg viewBox="0 0 32 32" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M10 9 L3 5" />
+                    <path d="M22 9 L29 5" />
+                    <rect x="12" y="6" width="8" height="6" />
+                    <path d="M13 12 L19 12 L21.5 29 L10.5 29 Z" />
+                    <path d="M12 18 L20 18" />
+                    <path d="M11.2 23.5 L20.8 23.5" />
+                  </svg>
+                  <span className="vs-badge">3</span>
+                </div>
+                <div className="vs-tree">
+                  <div className="vs-title">Beacon — Review</div>
+                  <div className="vs-row"><span className="vs-tw">▾</span> rocket-editor<span className="vs-count">2</span></div>
+                  <div className="vs-row sel"><span className="vs-dot">●</span> Add offline sync<span className="vs-score">8/10</span></div>
+                  <div className="vs-row"><span className="vs-dot">●</span> Fix lock race<span className="vs-score">6/10</span></div>
+                </div>
+                <div className="vs-detail">
+                  <div className="vs-card">
+                    <div className="vs-card-h">Twitter / X</div>
+                    <div className="vs-card-b">Shipped offline sync for Rocket Editor — your drafts survive a dead wifi connection now. ✦ #buildinpublic</div>
+                  </div>
+                  <div className="vs-acts">
+                    <span className="vs-btn pri">Approve</span>
+                    <span className="vs-btn">Edit</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* FEATURES */}
         <section className="sec">
           <div className="wrap sec-pad">
