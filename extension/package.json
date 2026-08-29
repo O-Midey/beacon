@@ -3,7 +3,7 @@
   "displayName": "Beacon — Review",
   "description": "Review, edit, and approve your build-in-public drafts from inside VS Code.",
   "version": "0.0.1",
-  "publisher": "omotosho",
+  "publisher": "Omotosho",
   "private": true,
   "license": "MIT",
   "icon": "media/icon.png",
