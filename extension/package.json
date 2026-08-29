@@ -1,0 +1,120 @@
+{
+  "name": "beacon-review",
+  "displayName": "Beacon — Review",
+  "description": "Review, edit, and approve your build-in-public drafts from inside VS Code.",
+  "version": "0.0.1",
+  "publisher": "omotosho",
+  "private": true,
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/O-Midey/beacon.git",
+    "directory": "extension"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "build-in-public",
+    "beacon",
+    "content",
+    "git",
+    "social"
+  ],
+  "galleryBanner": {
+    "color": "#171714",
+    "theme": "dark"
+  },
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "beacon.review",
+        "title": "Beacon: Review Drafts"
+      },
+      {
+        "command": "beacon.openEntry",
+        "title": "Open Draft",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "beacon.approve",
+        "title": "Approve",
+        "icon": "$(check)"
+      },
+      {
+        "command": "beacon.discard",
+        "title": "Discard",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "beacon.copyPlatform",
+        "title": "Copy",
+        "icon": "$(copy)"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        { "command": "beacon.approve", "when": "view == beaconReview && viewItem == entry", "group": "inline@1" },
+        { "command": "beacon.discard", "when": "view == beaconReview && viewItem == entry", "group": "inline@2" },
+        { "command": "beacon.openEntry", "when": "view == beaconReview && viewItem == entry", "group": "inline@3" },
+        { "command": "beacon.copyPlatform", "when": "view == beaconReview && viewItem == platform", "group": "inline@1" }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "beacon",
+          "title": "Beacon",
+          "icon": "media/beacon.svg"
+        }
+      ]
+    },
+    "views": {
+      "beacon": [
+        {
+          "id": "beaconReview",
+          "name": "Review",
+          "type": "tree"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "beaconReview",
+        "contents": "Review your build-in-public drafts side by side, then approve or discard.\n\n[Review Drafts](command:beacon.review)\n\nDrafts land here on their own after a significant commit."
+      }
+    ],
+    "configuration": {
+      "title": "Beacon",
+      "properties": {
+        "beacon.cliPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Beacon CLI executable. Leave empty to use `beacon` from your PATH."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "copy-ui": "node ./scripts/copy-ui.cjs",
+    "vscode:prepublish": "npm run compile && npm run copy-ui",
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.1",
+    "typescript": "^5.7.2"
+  }
+}

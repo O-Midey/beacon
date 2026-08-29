@@ -20,6 +20,14 @@ import { verifyToken } from "./token.js";
  *
  * `/health` stays tokenless by design: later shells port-probe it to discover
  * a running instance, and it exposes nothing but name/version/pid.
+ *
+ * CORS: the browser tab is same-origin and needs none, but the embedded shells
+ * (VS Code webview, Tauri) load the bundle from their own origin and call the
+ * API cross-origin. We reflect the caller's `Origin` so their `fetch`/
+ * `EventSource` can read responses. This does not widen the trust boundary —
+ * the bearer token remains the gate (a foreign origin still gets 401 without
+ * it), the Host allowlist still blocks DNS rebinding, and no cookies are used,
+ * so there is nothing to steal by being allowed to make the request.
  */
 
 export interface BeaconServerOptions {
@@ -52,6 +60,25 @@ function hostAllowed(req: IncomingMessage): boolean {
   return HOST_ALLOWLIST.has(name.toLowerCase());
 }
 
+const CORS_METHODS = "GET, POST, PATCH, OPTIONS";
+const CORS_HEADERS = "authorization, content-type";
+
+/**
+ * Reflect the requesting origin for cross-origin shells. No-op for same-origin
+ * requests (the browser tab sends no `Origin`). Set via `setHeader` so the
+ * values ride every later `writeHead` — JSON, SSE, static assets, and errors
+ * alike — without each responder having to know about CORS.
+ */
+function applyCors(req: IncomingMessage, res: ServerResponse): void {
+  const origin = req.headers.origin;
+  if (origin === undefined) return;
+  res.setHeader("access-control-allow-origin", origin);
+  res.setHeader("vary", "Origin");
+  res.setHeader("access-control-allow-methods", CORS_METHODS);
+  res.setHeader("access-control-allow-headers", CORS_HEADERS);
+  res.setHeader("access-control-max-age", "600");
+}
+
 function presentedToken(req: IncomingMessage, url: URL): string | undefined {
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) return header.slice("Bearer ".length);
@@ -71,6 +98,16 @@ export function createBeaconServer(options: BeaconServerOptions): BeaconServerHa
 
     if (!hostAllowed(req)) {
       throw new BeaconError("Forbidden host", "UNAUTHORIZED");
+    }
+
+    applyCors(req, res);
+
+    // Preflight is unauthenticated by spec (the browser strips credentials), so
+    // answer it before the token check — with the CORS headers already set.
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
     }
 
     if (req.method === "GET" && url.pathname === "/health") {
