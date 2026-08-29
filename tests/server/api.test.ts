@@ -98,6 +98,32 @@ function authed(path: string, init: RequestInit = {}): Promise<Response> {
   });
 }
 
+/**
+ * Raw node:http request — used where a header undici forbids scripts from
+ * setting (`Origin`, `Host`) must reach the wire verbatim, as a real browser or
+ * a rebinding attack would send it.
+ */
+function raw(
+  method: string,
+  path: string,
+  headers: Record<string, string>,
+): Promise<{ status: number; headers: NodeJS.Dict<string | string[]> }> {
+  const { port } = handle.server.address() as AddressInfo;
+  // Default to an allowed Host; a test can override it to mimic rebinding.
+  const merged = { host: `127.0.0.1:${port}`, ...headers };
+  return new Promise((resolve, reject) => {
+    const req = request(
+      { host: "127.0.0.1", port, method, path, setHost: false, headers: merged },
+      (res) => {
+        res.resume();
+        resolve({ status: res.statusCode ?? 0, headers: res.headers });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 interface WireError {
   code: string;
   message: string;
@@ -158,6 +184,53 @@ describe("auth", () => {
     const body = (await res.json()) as { name: string; version: string; pid: number };
     expect(body.name).toBe("beacon");
     expect(body.version).toBe("0.0.0-test");
+  });
+});
+
+/* ---------------------------------- cors ---------------------------------- */
+
+describe("CORS (embedded shells)", () => {
+  // The VS Code webview and Tauri window load the bundle from their own origin
+  // and call the loopback API cross-origin; the browser tab is same-origin.
+  const ORIGIN = "vscode-webview://abc-123";
+
+  it("answers preflight tokenless, reflecting the origin and allowing auth", async () => {
+    const { status, headers } = await raw("OPTIONS", "/queue", {
+      origin: ORIGIN,
+      "access-control-request-method": "GET",
+      "access-control-request-headers": "authorization",
+    });
+    expect(status).toBe(204);
+    expect(headers["access-control-allow-origin"]).toBe(ORIGIN);
+    expect(String(headers["access-control-allow-headers"]).toLowerCase()).toContain("authorization");
+    expect(String(headers["access-control-allow-methods"])).toContain("PATCH");
+  });
+
+  it("reflects the origin on an authenticated response", async () => {
+    seed(entry("a"));
+    const { status, headers } = await raw("GET", "/queue", {
+      origin: ORIGIN,
+      authorization: `Bearer ${TOKEN}`,
+    });
+    expect(status).toBe(200);
+    expect(headers["access-control-allow-origin"]).toBe(ORIGIN);
+    expect(String(headers["vary"])).toContain("Origin");
+  });
+
+  it("omits CORS headers for same-origin requests (no Origin)", async () => {
+    seed(entry("a"));
+    const res = await authed("/queue");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("still rejects a preflight from a forbidden Host (rebinding)", async () => {
+    const { status } = await raw("OPTIONS", "/queue", {
+      host: "evil.example.com",
+      origin: ORIGIN,
+      "access-control-request-method": "GET",
+    });
+    expect(status).toBe(401);
   });
 });
 
